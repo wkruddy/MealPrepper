@@ -24,6 +24,10 @@ console = Console()
 def _setup_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
+    # httpx logs every request at INFO — hide unless debugging
+    if not verbose:
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def _parse_date(value: Optional[str]) -> date | None:

@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-# Install MealPrepper launchd jobs (macOS).
+# Install MealPrepper launchd jobs (macOS only).
 set -euo pipefail
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "This script is for macOS (launchd). On Linux use: ./scripts/install_systemd.sh" >&2
+  exit 1
+fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLIST_DIR="$HOME/Library/LaunchAgents"
-PYTHON="$(command -v python3)"
+if [[ -x "$ROOT/.venv/bin/python" ]]; then
+  PYTHON="$ROOT/.venv/bin/python"
+else
+  PYTHON="$(command -v python3)"
+fi
 MEALPREPPER="$PYTHON -m mealprepper"
 
 mkdir -p "$PLIST_DIR"
@@ -102,7 +111,9 @@ echo "Installed $DAILY_PLIST"
 echo ""
 echo "Done. Logs: $ROOT/data/logs/"
 echo ""
-echo "Cron alternative (Linux/macOS):"
-echo "  0 10 * * 6  cd $ROOT && $MEALPREPPER plan-week"
-echo "  0  8 * * 0  cd $ROOT && $MEALPREPPER generate-grocery"
-echo "  0  7 * * *  cd $ROOT && $MEALPREPPER send-daily"
+echo "On Linux, use ./scripts/install_systemd.sh instead."
+echo ""
+echo "Cron alternative:"
+echo "  0 10 * * 6  cd $ROOT && $ROOT/scripts/cron/run_scheduled.sh weekly-plan"
+echo "  0  8 * * 0  cd $ROOT && $ROOT/scripts/cron/run_scheduled.sh grocery"
+echo "  0  7 * * *  cd $ROOT && $ROOT/scripts/cron/run_scheduled.sh daily"

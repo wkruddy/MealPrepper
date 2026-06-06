@@ -24,9 +24,9 @@ Set `SMS_BACKEND` in `.env`:
 | Value | Behavior |
 |-------|----------|
 | `console` | Print to stdout (dev default) |
-| `twilio` | Twilio REST API |
-| `apple_shortcuts` | Webhook to Shortcuts |
-| `imsg` | Stub for native iMessage |
+| `twilio` | Twilio REST API (recommended on Linux servers) |
+| `apple_shortcuts` | Webhook to macOS Shortcuts |
+| `imsg` | macOS-only stub for native iMessage |
 
 ## CLI
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any, TypeVar
 
 import httpx
@@ -61,15 +62,26 @@ class OllamaClient:
         if json_mode:
             payload["format"] = "json"
 
+        call_label = call_type.value if isinstance(call_type, CallType) else str(call_type)
         url = f"{self.base_url}/v1/chat/completions"
+        logger.info("Ollama request: %s (model=%s)", call_label, self.model)
+        started = time.monotonic()
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(url, json=payload)
                 response.raise_for_status()
                 data = response.json()
+                elapsed = time.monotonic() - started
+                logger.info("Ollama complete: %s (%.1fs)", call_label, elapsed)
                 return data["choices"][0]["message"]["content"]
         except httpx.HTTPError as exc:
-            logger.warning("Ollama unavailable (%s), using fallback parser", exc)
+            elapsed = time.monotonic() - started
+            logger.warning(
+                "Ollama unavailable after %.1fs (%s): %s",
+                elapsed,
+                call_label,
+                exc,
+            )
             raise OllamaUnavailableError(str(exc)) from exc
 
     def chat_json(

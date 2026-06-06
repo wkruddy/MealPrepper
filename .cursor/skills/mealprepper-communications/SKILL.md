@@ -48,9 +48,13 @@ Ratings: `loved`, `liked`, `neutral`, `disliked`, `reject`
 
 Updates `PreferenceProfile` in SQLite for next week's meal finder prompts.
 
-## Cron
+## Cron / systemd
+
+Linux server:
 
 ```bash
+./scripts/install_systemd.sh
+# or manually:
 ./scripts/cron/run_scheduled.sh daily
 ./scripts/cron/run_scheduled.sh feedback
 ```

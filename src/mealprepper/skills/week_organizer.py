@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 
 from mealprepper.models.family import FamilyProfile
 from mealprepper.models.meals import PlannedMeal
 from mealprepper.models.plans import WeeklyPlan, PlanStatus
 from mealprepper.skills.meal_finder import DAYS, MealFinderSkill, WeekMealOutline
+
+logger = logging.getLogger(__name__)
 
 
 class WeekOrganizerSkill:
@@ -27,8 +30,10 @@ class WeekOrganizerSkill:
         week_start: date | None = None,
     ) -> WeeklyPlan:
         start, end = self.week_bounds(week_start)
+        logger.info("Organizing week %s — %s", start, end)
         outlines = self.meal_finder.find_week_outline(family, preferences, start)
         meals = self.meal_finder.outline_to_planned_meals(outlines, family)
+        logger.info("Week organized: %d planned meals", len(meals))
         playbook = self.render_playbook(start, end, meals)
         return WeeklyPlan(
             week_start=start,

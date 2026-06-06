@@ -70,23 +70,58 @@ Also: `python -m mealprepper <command>`
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
-| `OLLAMA_MODEL` | `llama3.2` | Model name |
+| `OLLAMA_MODEL` | `llama3.2` | Model name — use a **fast** model for `plan-week` (40+ LLM calls) |
 | `MEALPREPPER_DATA_DIR` | `./data` | SQLite + output files |
-| `SMS_BACKEND` | `console` | `console`, `twilio`, `apple_shortcuts`, `imsg` |
+| `SMS_BACKEND` | `console` | `console` (dev), `twilio` (Linux/production), `apple_shortcuts` (macOS webhook), `imsg` (macOS stub) |
 | `APPROVAL_REQUIRED` | `true` | Send approval SMS after planning |
-| `DAILY_REMINDER_HOUR` | `7` | Used by launchd/cron scheduling |
+| `DAILY_REMINDER_HOUR` | `7` | Used by systemd/cron/launchd scheduling |
 
 Twilio vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `TWILIO_TO_NUMBER`
 
-Apple Shortcuts: `APPLE_SHORTCUTS_WEBHOOK_URL`
+On Linux servers, use `SMS_BACKEND=twilio` for real SMS. `apple_shortcuts` and `imsg` are macOS-only integrations.
 
-## Scheduling (macOS)
+## Scheduling
+
+Weekly jobs run automatically once installed. Pick the method for your OS:
+
+### Linux (systemd — recommended)
+
+```bash
+./scripts/install_systemd.sh
+```
+
+Installs user systemd timers for Saturday plan (10:00), Sunday grocery (08:00), and daily SMS (07:00). Logs go to `data/logs/`.
+
+If timers should run while you are logged out:
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+Check status: `systemctl --user list-timers 'mealprepper-*'`
+
+### macOS (launchd)
 
 ```bash
 ./scripts/install_launchd.sh
 ```
 
-Installs launchd plists for Saturday plan, Sunday grocery, and daily 7am SMS. See `scripts/` for cron alternatives.
+Installs launchd plists under `~/Library/LaunchAgents/`. See `scripts/com.mealprepper.plan-week.plist.example`.
+
+### Any platform (cron)
+
+```bash
+chmod +x scripts/cron/run_scheduled.sh
+crontab -e
+```
+
+```cron
+0 10 * * 6  /path/to/MealPrepper/scripts/cron/run_scheduled.sh weekly-plan >> /path/to/MealPrepper/data/logs/plan-week.log 2>&1
+0  8 * * 0  /path/to/MealPrepper/scripts/cron/run_scheduled.sh grocery >> /path/to/MealPrepper/data/logs/generate-grocery.log 2>&1
+0  7 * * *  /path/to/MealPrepper/scripts/cron/run_scheduled.sh daily >> /path/to/MealPrepper/data/logs/send-daily.log 2>&1
+```
+
+Auto-detect OS: `./scripts/install_scheduler.sh`
 
 ## Development
 
@@ -124,21 +159,6 @@ MealPrepper keeps LLM prompts small by **retrieving** only relevant history inst
 | `OLLAMA_EMBEDDING_MODEL` (env) | `nomic-embed-text` | Model used when embeddings are enabled |
 
 Run `mealprepper init-db` to create index tables and FTS migrations on existing databases.
-
-## Context & Performance
-
-MealPrepper keeps local LLM prompts small via **context budgets**, **SQLite FTS5 indexing**, and **compressed preference summaries** — so agents retrieve only relevant chunks instead of dumping full history.
-
-### How it works
-
-| Layer | Purpose |
-|-------|---------|
-| `ContextBudget` | Per-call char limits (`meal_finder`, `comms`, `grocery`, etc.) |
-| `PromptBuilder` | Assembles system + task + prioritized retrieved sections |
-| `ContextCompressor` | Summarizes feedback/plans into compact notes stored in SQLite |
-| `MealIndex` | FTS5 search over saved meals (title, ingredients, tags) |
-| `PreferenceIndex` | Retrieves relevant likes/dislikes for a meal block |
-| `PlanIndex` | Recent/similar week summaries instead of full plan JSON |
 
 ### Tuning for smaller models (e.g. `llama3.2:3b`)
 

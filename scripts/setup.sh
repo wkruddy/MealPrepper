@@ -19,6 +19,11 @@ python -m mealprepper init-db
 echo ""
 echo "MealPrepper installed. Next steps:"
 echo "  1. Start Ollama: ollama serve && ollama pull llama3.2"
-echo "  2. Edit .env if needed (SMS_BACKEND, etc.)"
+echo "  2. Edit .env if needed (SMS_BACKEND=twilio for production SMS on Linux)"
 echo "  3. mealprepper plan-week --auto-approve"
 echo "  4. mealprepper generate-grocery"
+if [[ "$(uname -s)" == "Linux" ]]; then
+  echo "  5. ./scripts/install_systemd.sh   # schedule weekly/daily jobs"
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+  echo "  5. ./scripts/install_launchd.sh   # schedule weekly/daily jobs"
+fi

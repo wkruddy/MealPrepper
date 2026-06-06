@@ -108,12 +108,20 @@ Cover every required block for each day. Avoid disliked meals/ingredients.""",
         )
 
         messages = builder.build_messages()
+        logger.info(
+            "Generating week outline for %s — %s (model=%s)",
+            week_start,
+            week_end,
+            self.llm.model,
+        )
         try:
-            return self.llm.chat_json_list(
+            outlines = self.llm.chat_json_list(
                 messages,
                 WeekMealOutline,
                 call_type=CallType.MEAL_FINDER,
             )
+            logger.info("Week outline ready: %d meal slots", len(outlines))
+            return outlines
         except (OllamaUnavailableError, ValueError) as exc:
             logger.warning("LLM meal finder failed, using template week: %s", exc)
             return self._fallback_outline(week_start)
@@ -161,7 +169,16 @@ Cover every required block for each day. Avoid disliked meals/ingredients.""",
         family: FamilyProfile,
     ) -> list[PlannedMeal]:
         meals: list[PlannedMeal] = []
-        for outline in outlines:
+        total = len(outlines)
+        for index, outline in enumerate(outlines, start=1):
+            logger.info(
+                "Expanding recipe %d/%d: %s (%s, %s)",
+                index,
+                total,
+                outline.title,
+                outline.day,
+                outline.meal_block,
+            )
             recipe = self.expand_recipe(outline, family)
             member_ids = self._members_for_block(outline.meal_block, family)
             meals.append(
