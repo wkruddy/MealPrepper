@@ -1,0 +1,38 @@
+llm:
+  temperature: 0.4
+  max_tokens: 4096
+
+context:
+  max_context_chars: 12000
+  budgets:
+    meal_finder: 8000
+    recipe_expand: 4000
+    week_organizer: 6000
+    grocery: 6000
+    comms: 3000
+    preference: 4000
+  warn_at_pct: 0.85
+
+index:
+  meal_top_k: 5
+  feedback_top_k: 8
+  plan_top_k: 2
+  use_embeddings: false
+
+planning:
+  week_starts_on: monday
+  minimize_waste: true
+  overlap_ingredients: true
+  approval_required: true
+
+storage:
+  database: mealprepper.db
+
+agents:
+  weekly_meals:
+    max_iterations: 3
+  grocery:
+    consolidate_duplicates: true
+  communications:
+    morning_summary: true
+    collect_feedback: true

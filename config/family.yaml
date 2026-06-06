@@ -1,0 +1,58 @@
+timezone: America/New_York
+
+members:
+  - id: toddler
+    name: Toddler
+    role: toddler
+    age_years: 3
+    constraints:
+      - no_spicy
+      - dinner_by: "17:30"
+      - max_dinner_prep_minutes: 45
+      - quick_lunches: true
+      - can_eat_like_adults: true
+    notes: "School weekday lunch; weekend home lunch; breakfast at home."
+
+  - id: infant
+    name: Infant
+    role: infant
+    age_months: 7.5
+    constraints:
+      - baby_led_weaning: true
+      - age_appropriate_foods: true
+    notes: "BLW finger foods; include prep guidance for safe sizes."
+
+  - id: adult_1
+    name: Adult 1
+    role: adult
+    constraints:
+      - variable_breakfast: true
+      - simple_lunches: true
+      - bulk_prep_lunch: true
+    notes: "Off work ~5pm; shared dinners with toddler."
+
+  - id: adult_2
+    name: Adult 2
+    role: adult
+    constraints:
+      - variable_breakfast: true
+      - simple_lunches: true
+      - bulk_prep_lunch: true
+    notes: "Off work ~5pm; shared dinners with toddler."
+
+meal_blocks:
+  - toddler_school_lunch
+  - toddler_weekend_lunch
+  - toddler_breakfast
+  - adult_breakfast
+  - adult_lunch
+  - adult_dinner
+  - infant_blw
+  - bulk_meal_prep
+
+schedule:
+  grocery_ready_day: sunday
+  grocery_ready_time: "08:00"
+  weekly_plan_day: saturday
+  weekly_plan_time: "10:00"
+  daily_reminder_time: "07:00"
