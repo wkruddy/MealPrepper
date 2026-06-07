@@ -366,6 +366,25 @@ class SQLiteStore:
             return None
         return GroceryList.model_validate(json.loads(row["payload"]))
 
+    def get_grocery(self, grocery_id: str) -> GroceryList | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT payload FROM grocery_lists WHERE id = ?",
+                (grocery_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return GroceryList.model_validate(json.loads(row["payload"]))
+
+    def get_latest_grocery(self) -> GroceryList | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT payload FROM grocery_lists ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+        if not row:
+            return None
+        return GroceryList.model_validate(json.loads(row["payload"]))
+
     def save_feedback(self, feedback: MealFeedback) -> MealFeedback:
         fid = feedback.id or str(uuid.uuid4())
         now = _utcnow().isoformat()

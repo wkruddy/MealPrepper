@@ -1,0 +1,117 @@
+# Curated meals per block — used for fallback planning and variety enforcement.
+# Each block should have at least 3 options so no meal repeats more than 2 days/week.
+
+toddler_school_lunch:
+  - title: Turkey & Cheese Roll-ups
+    key_ingredients: [turkey, tortilla, cheese, cucumber]
+    prep_minutes: 10
+  - title: Hummus Veggie Pinwheels
+    key_ingredients: [tortilla, hummus, cucumber, bell pepper]
+    prep_minutes: 10
+  - title: Cheese & Crackers Bento
+    key_ingredients: [cheese, crackers, grapes, carrots]
+    prep_minutes: 8
+  - title: Bean & Cheese Quesadilla Wedges
+    key_ingredients: [tortilla, black beans, cheese]
+    prep_minutes: 12
+
+toddler_weekend_lunch:
+  - title: Mini Quesadillas
+    key_ingredients: [tortilla, cheese, beans]
+    prep_minutes: 15
+  - title: Mac & Cheese with Peas
+    key_ingredients: [pasta, cheese, peas]
+    prep_minutes: 20
+  - title: Grilled Cheese & Tomato Soup
+    key_ingredients: [bread, cheese, tomato soup]
+    prep_minutes: 15
+  - title: Chicken Nuggets & Sweet Potato
+    key_ingredients: [chicken, sweet potato]
+    prep_minutes: 25
+
+toddler_breakfast:
+  - title: Banana Pancake Bites
+    key_ingredients: [banana, eggs, oats]
+    prep_minutes: 15
+  - title: Scrambled Eggs & Toast Strips
+    key_ingredients: [eggs, toast, butter]
+    prep_minutes: 10
+  - title: Yogurt with Berries
+    key_ingredients: [yogurt, berries]
+    prep_minutes: 5
+  - title: Oatmeal with Banana
+    key_ingredients: [oats, banana, cinnamon]
+    prep_minutes: 10
+
+adult_breakfast:
+  - title: Overnight Oats
+    key_ingredients: [oats, yogurt, berries]
+    prep_minutes: 10
+  - title: Veggie Scramble
+    key_ingredients: [eggs, spinach, peppers, cheese]
+    prep_minutes: 15
+  - title: Greek Yogurt Parfait
+    key_ingredients: [yogurt, granola, honey, berries]
+    prep_minutes: 5
+  - title: Avocado Toast with Eggs
+    key_ingredients: [bread, avocado, eggs]
+    prep_minutes: 12
+
+adult_lunch:
+  - title: Mediterranean Grain Bowls
+    key_ingredients: [quinoa, cucumber, chickpeas, feta]
+    prep_minutes: 20
+  - title: Chicken Salad Wraps
+    key_ingredients: [chicken, tortilla, lettuce, yogurt]
+    prep_minutes: 15
+  - title: Lentil Soup & Bread
+    key_ingredients: [lentils, carrots, celery, bread]
+    prep_minutes: 25
+  - title: Tuna & White Bean Salad
+    key_ingredients: [tuna, white beans, olive oil, lemon]
+    prep_minutes: 15
+
+adult_dinner:
+  - title: Sheet Pan Lemon Herb Chicken
+    key_ingredients: [chicken thighs, broccoli, potatoes]
+    prep_minutes: 35
+  - title: Beef & Broccoli Stir Fry
+    key_ingredients: [beef, broccoli, rice, soy sauce]
+    prep_minutes: 30
+  - title: Baked Salmon & Roasted Veg
+    key_ingredients: [salmon, zucchini, sweet potato]
+    prep_minutes: 35
+  - title: Mild Turkey Tacos
+    key_ingredients: [ground turkey, tortillas, lettuce, cheese]
+    prep_minutes: 25
+  - title: Pasta Primavera
+    key_ingredients: [pasta, zucchini, peas, parmesan]
+    prep_minutes: 30
+
+infant_blw:
+  - title: Steamed Broccoli & Avocado Strips
+    key_ingredients: [broccoli, avocado]
+    prep_minutes: 10
+  - title: Soft Banana Spears & Yogurt
+    key_ingredients: [banana, yogurt]
+    prep_minutes: 5
+  - title: Sweet Potato Wedges
+    key_ingredients: [sweet potato]
+    prep_minutes: 15
+  - title: Soft Scrambled Egg Strips
+    key_ingredients: [eggs]
+    prep_minutes: 10
+  - title: Steamed Green Bean Strips
+    key_ingredients: [green beans]
+    prep_minutes: 10
+  - title: Soft Salmon Flake & Peas
+    key_ingredients: [salmon, peas]
+    prep_minutes: 15
+
+bulk_meal_prep:
+  - title: Batch Cooked Rice & Roasted Veg
+    key_ingredients: [rice, sweet potato, zucchini]
+    prep_minutes: 40
+  - title: Shredded Chicken for the Week
+    key_ingredients: [chicken breast, olive oil]
+    prep_minutes: 45

@@ -3,52 +3,44 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 
-from pydantic import BaseModel, Field
-
 from mealprepper.config import get_settings
 from mealprepper.context.budget import CallType, ContextBudget, load_context_budget
 from mealprepper.context.prompt_builder import PromptBuilder
 from mealprepper.index.meal_index import MealIndex
 from mealprepper.index.plan_index import PlanIndex
 from mealprepper.index.preference_index import PreferenceIndex
-from mealprepper.llm.ollama_client import OllamaClient, OllamaUnavailableError
+from mealprepper.llm.ollama_client import OllamaClient, OllamaUnavailableError, _extract_json
 from mealprepper.models.family import FamilyProfile
 from mealprepper.models.feedback import PreferenceProfile
 from mealprepper.models.meals import MealRecipe, PlannedMeal, RecipeStep
+from mealprepper.skills.blw_safety import BLWSafety
+from mealprepper.skills.meal_blocks import DAYS, WeekMealOutline
+from mealprepper.skills.meal_catalog import MealCatalog
+from mealprepper.skills.week_outline import finalize_outline, parse_outline_items, required_slots
 from mealprepper.storage.sqlite import SQLiteStore
 
 logger = logging.getLogger(__name__)
 
-DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-
-WEEKDAY_SCHOOL_BLOCKS = {
-    "monday": ["toddler_school_lunch", "toddler_breakfast", "adult_breakfast", "adult_lunch", "adult_dinner", "infant_blw"],
-    "tuesday": ["toddler_school_lunch", "toddler_breakfast", "adult_breakfast", "adult_lunch", "adult_dinner", "infant_blw"],
-    "wednesday": ["toddler_school_lunch", "toddler_breakfast", "adult_breakfast", "adult_lunch", "adult_dinner", "infant_blw"],
-    "thursday": ["toddler_school_lunch", "toddler_breakfast", "adult_breakfast", "adult_lunch", "adult_dinner", "infant_blw"],
-    "friday": ["toddler_school_lunch", "toddler_breakfast", "adult_breakfast", "adult_lunch", "adult_dinner", "infant_blw"],
-    "saturday": ["toddler_weekend_lunch", "toddler_breakfast", "adult_breakfast", "adult_lunch", "adult_dinner", "infant_blw", "bulk_meal_prep"],
-    "sunday": ["toddler_weekend_lunch", "toddler_breakfast", "adult_breakfast", "adult_lunch", "adult_dinner", "infant_blw"],
-}
-
-
-class WeekMealOutline(BaseModel):
-    day: str
-    meal_block: str
-    title: str
-    key_ingredients: list[str] = Field(default_factory=list)
-    prep_minutes: int = 30
+MEAL_BLOCK_RULES = """Assign meals that match WHO eats them:
+- toddler_school_lunch: portable packed lunches (wraps, pinwheels, bento boxes) — not hot dinners
+- toddler_weekend_lunch: simple sit-down lunches for home
+- toddler_breakfast: quick kid breakfasts (pancakes, eggs, yogurt, oatmeal)
+- adult_breakfast: adult breakfasts (may differ from toddler breakfast)
+- adult_lunch: work lunches, grain bowls, soups, salads, leftovers
+- adult_dinner: main family dinners (protein + veg + starch); toddler eats a mild portion at home
+- infant_blw: ONLY age-appropriate BLW finger foods — never adult meals repurposed
+- bulk_meal_prep: batch components for the week (grains, proteins, roasted veg)"""
 
 
 class MealFinderSkill:
     """Find age-appropriate meals aligned with family constraints."""
 
     SYSTEM = """You are the MealPrepper meal finder for a family with a toddler (no spicy, quick dinners),
-two adults, and a 7.5mo infant doing baby-led weaning. Users are competent cooks.
+two adults, and an infant doing baby-led weaning. Users are competent cooks.
 
-Return practical, real meals — not generic placeholders. Reuse ingredients across the week when possible.
-Adult dinners must be ready within 45 minutes total prep+cook. Toddler eats similar to adults (mild seasoning).
-Include BLW-safe finger food options for infant blocks."""
+Return practical, real meals — not generic placeholders. Reuse ingredients across the week when sensible,
+but do NOT repeat the same meal title more than twice per meal block in one week.
+Adult dinners must be ready within 45 minutes total prep+cook."""
 
     def __init__(
         self,
@@ -66,9 +58,16 @@ Include BLW-safe finger food options for infant blocks."""
         self.meal_index = meal_index or MealIndex(settings=self.settings)
         self.preference_index = preference_index or PreferenceIndex(settings=self.settings)
         self.plan_index = plan_index or PlanIndex(settings=self.settings)
-        cfg = self.settings.merged_config().get("index", {})
-        self.meal_top_k = int(cfg.get("meal_top_k", 5))
-        self.feedback_top_k = int(cfg.get("feedback_top_k", 8))
+        cfg = self.settings.merged_config()
+        index_cfg = cfg.get("index", {})
+        planning_cfg = cfg.get("planning", {})
+        self.meal_top_k = int(index_cfg.get("meal_top_k", 5))
+        self.feedback_top_k = int(index_cfg.get("feedback_top_k", 8))
+        self.max_meal_repeat = int(planning_cfg.get("max_meal_repeat_days", 2))
+        self.catalog = MealCatalog(self.settings)
+        from mealprepper.skills.cook_efficiency import CookEfficiencyConfig
+
+        self.cook_efficiency = CookEfficiencyConfig.from_settings(self.settings)
 
     def find_week_outline(
         self,
@@ -82,28 +81,53 @@ Include BLW-safe finger food options for infant blocks."""
         past_meals_text = self.meal_index.format_for_prompt(past_meals)
         feedback_ctx = self.preference_index.relevant_for_block("adult_dinner", top_k=self.feedback_top_k)
         plan_ctx = self.plan_index.similar_to_week(week_start, top_k=2)
+        blw = BLWSafety(family, self.settings)
 
         builder = PromptBuilder(
             budget=self.budget,
             call_type=CallType.MEAL_FINDER,
             system=self.SYSTEM,
-            task=f"Plan meals for {week_start} to {week_end}.",
+            task=f"Plan meals for week starting {week_start} ({week_start} to {week_end}).",
         )
         builder.add_section("Family", self._family_context(family), priority=10)
+        builder.add_section("Meal block rules", MEAL_BLOCK_RULES, priority=12)
+        if self.cook_efficiency.enabled:
+            builder.add_section(
+                "Cook efficiency",
+                "Minimize cook sessions — this matters more than variety.\n"
+                "- Plan ~4 unique adult dinners for the week; repeat them on other nights.\n"
+                "- Each dinner should yield next-day adult lunch leftovers (same title).\n"
+                "- Batch-friendly meals: sheet pan, stir fry, roast chicken, grain bowls, tacos.\n"
+                "- Saturday bulk_meal_prep should prep components reused in weekday meals.\n"
+                f"- Same title may repeat up to {self.max_meal_repeat} times per block.",
+                priority=13,
+            )
+        else:
+            builder.add_section(
+                "Variety",
+                f"Use at least 3 different meals per meal block across the week. "
+                f"Never repeat the same title more than {self.max_meal_repeat} times per meal block. "
+                "Do not serve identical dinners every night. Invent original titles — do not copy example lists.",
+                priority=13,
+            )
+        builder.add_section("BLW safety", blw.prompt_context(), priority=14)
         builder.add_section("Preferences", compact_prefs.to_prompt_context(), priority=20)
         if feedback_ctx:
             builder.add_section("Recent feedback", feedback_ctx, priority=25)
+        builder.add_section("Block style guide", self.catalog.prompt_style_guide(), priority=35)
         builder.add_section("Past meals to reuse or vary", past_meals_text, priority=40)
         if plan_ctx:
             builder.add_section("Past weeks", plan_ctx, priority=50)
         builder.add_section(
-            "Requirements",
-            """Meal blocks per day:
-- Weekdays: toddler school lunch, toddler breakfast, adult breakfast/lunch/dinner, infant BLW
-- Weekends: toddler home lunch instead of school lunch; optional bulk prep Saturday
+            "Output format",
+            """Return a JSON array. Each object MUST include:
+- day: lowercase weekday name (monday..sunday) — NOT an ISO date
+- meal_block: exact block id (e.g. toddler_school_lunch, adult_dinner, infant_blw)
+- title: meal name appropriate for that block
+- key_ingredients: array of strings
+- prep_minutes: integer
 
-Return JSON array of objects with: day, meal_block, title, key_ingredients (array), prep_minutes.
-Cover every required block for each day. Avoid disliked meals/ingredients.""",
+Cover every required block for each day.""",
             priority=15,
         )
 
@@ -115,18 +139,27 @@ Cover every required block for each day. Avoid disliked meals/ingredients.""",
             self.llm.model,
         )
         try:
-            outlines = self.llm.chat_json_list(
+            content = self.llm.chat(
                 messages,
-                WeekMealOutline,
+                json_mode=True,
                 call_type=CallType.MEAL_FINDER,
             )
+            parsed = _extract_json(content)
+            if not isinstance(parsed, list):
+                raise ValueError(f"Expected JSON array, got {type(parsed)}")
+            outlines = parse_outline_items(parsed, week_start)
+            if len(outlines) < len(required_slots()) // 2:
+                raise ValueError(f"Too few valid outline items ({len(outlines)})")
+            outlines = finalize_outline(outlines, week_start, self.catalog, self.max_meal_repeat)
             logger.info("Week outline ready: %d meal slots", len(outlines))
             return outlines
         except (OllamaUnavailableError, ValueError) as exc:
-            logger.warning("LLM meal finder failed, using template week: %s", exc)
-            return self._fallback_outline(week_start)
+            logger.warning("LLM meal finder failed, using catalog fallback: %s", exc)
+            fallback = self.catalog.build_fallback_outline(week_start, self.max_meal_repeat)
+            return finalize_outline(fallback, week_start, self.catalog, self.max_meal_repeat)
 
     def expand_recipe(self, outline: WeekMealOutline, family: FamilyProfile) -> MealRecipe:
+        blw = BLWSafety(family, self.settings)
         relevant = self.meal_index.search(
             outline.title,
             meal_block=outline.meal_block,
@@ -138,30 +171,35 @@ Cover every required block for each day. Avoid disliked meals/ingredients.""",
             budget=self.budget,
             call_type=CallType.RECIPE_EXPAND,
             system=self.SYSTEM,
-            task=f"Expand this meal into a full recipe JSON object:\nTitle: {outline.title}\nDay: {outline.day}, Block: {outline.meal_block}\nKey ingredients: {', '.join(outline.key_ingredients)}",
+            task=(
+                f"Expand this meal into a full recipe JSON object:\n"
+                f"Title: {outline.title}\n"
+                f"Day: {outline.day}, Block: {outline.meal_block}\n"
+                f"Key ingredients: {', '.join(outline.key_ingredients)}"
+            ),
         )
+        builder.add_section("Meal block rules", MEAL_BLOCK_RULES, priority=5)
         builder.add_section(
             "Fields",
             "title, description, prep_minutes, cook_minutes, servings, ingredients (name, quantity, unit, category), "
             "steps (order, instruction, duration_minutes), tags, infant_guidance, toddler_modifications.",
             priority=10,
         )
-        builder.add_section(
-            "Family context",
-            "toddler no spicy; infant BLW 7.5mo; adults competent cooks.",
-            priority=20,
-        )
+        builder.add_section("Family context", self._family_context(family), priority=20)
+        if outline.meal_block == "infant_blw":
+            builder.add_section("BLW safety", blw.prompt_context(), priority=15)
         if past_hint:
             builder.add_section("Similar past recipes", past_hint, priority=40)
 
         try:
-            return self.llm.chat_json(
+            recipe = self.llm.chat_json(
                 builder.build_messages(),
                 MealRecipe,
                 call_type=CallType.RECIPE_EXPAND,
             )
+            return self._apply_block_safety(recipe, outline, blw)
         except (OllamaUnavailableError, ValueError):
-            return self._fallback_recipe(outline)
+            return self._fallback_recipe(outline, blw)
 
     def outline_to_planned_meals(
         self,
@@ -169,17 +207,39 @@ Cover every required block for each day. Avoid disliked meals/ingredients.""",
         family: FamilyProfile,
     ) -> list[PlannedMeal]:
         meals: list[PlannedMeal] = []
+        recipe_cache: dict[tuple[str, str], MealRecipe] = {}
         total = len(outlines)
         for index, outline in enumerate(outlines, start=1):
-            logger.info(
-                "Expanding recipe %d/%d: %s (%s, %s)",
-                index,
-                total,
-                outline.title,
-                outline.day,
-                outline.meal_block,
+            source_key = (
+                (outline.reuse_of_day, outline.reuse_of_block)
+                if outline.reuse_of_day and outline.reuse_of_block
+                else None
             )
-            recipe = self.expand_recipe(outline, family)
+            if source_key and source_key in recipe_cache:
+                recipe = recipe_cache[source_key].model_copy(deep=True)
+                recipe.title = outline.title
+                logger.info(
+                    "Reusing recipe %d/%d: %s (%s, %s) from %s %s",
+                    index,
+                    total,
+                    outline.title,
+                    outline.day,
+                    outline.meal_block,
+                    outline.reuse_of_day,
+                    outline.reuse_of_block,
+                )
+            else:
+                logger.info(
+                    "Expanding recipe %d/%d: %s (%s, %s)",
+                    index,
+                    total,
+                    outline.title,
+                    outline.day,
+                    outline.meal_block,
+                )
+                recipe = self.expand_recipe(outline, family)
+                recipe_cache[(outline.day, outline.meal_block)] = recipe
+
             member_ids = self._members_for_block(outline.meal_block, family)
             meals.append(
                 PlannedMeal(
@@ -187,70 +247,81 @@ Cover every required block for each day. Avoid disliked meals/ingredients.""",
                     day=outline.day,
                     recipe=recipe,
                     member_ids=member_ids,
+                    cook_source_day=outline.reuse_of_day,
+                    cook_source_block=outline.reuse_of_block,
+                    cook_note=outline.cook_note,
                 )
             )
         return meals
 
+    def _apply_block_safety(
+        self,
+        recipe: MealRecipe,
+        outline: WeekMealOutline,
+        blw: BLWSafety,
+    ) -> MealRecipe:
+        ingredient_names = [i.name for i in recipe.ingredients] or outline.key_ingredients
+        if outline.meal_block == "infant_blw":
+            warnings, blocked, guidance = blw.validate_meal(recipe.title, ingredient_names)
+            if warnings:
+                logger.warning("BLW check for %s: %s", recipe.title, "; ".join(warnings))
+            recipe.infant_guidance = guidance
+            if blocked:
+                recipe.ingredients = [
+                    ing
+                    for ing in recipe.ingredients
+                    if not any(b in ing.name.lower() for b in blocked)
+                ]
+        elif outline.meal_block.startswith("toddler"):
+            if not recipe.toddler_modifications:
+                recipe.toddler_modifications = "No spice; bite-sized pieces; check salt."
+        return recipe
+
     def _family_context(self, family: FamilyProfile) -> str:
         lines = []
-        for m in family.members:
-            lines.append(f"- {m.name} ({m.role.value}): {m.notes}; constraints={m.constraints}")
+        for member in family.members:
+            age = ""
+            if member.age_months is not None:
+                age = f", {member.age_months}mo"
+            elif member.age_years is not None:
+                age = f", {member.age_years}y"
+            lines.append(
+                f"- {member.name} ({member.role.value}{age}): {member.notes}; constraints={member.constraints}"
+            )
         return "\n".join(lines)
 
     def _members_for_block(self, block: str, family: FamilyProfile) -> list[str]:
         if block.startswith("toddler"):
-            t = family.toddler()
-            return [t.id] if t else []
+            toddler = family.toddler()
+            return [toddler.id] if toddler else []
         if block == "infant_blw":
-            i = family.infant()
-            return [i.id] if i else []
+            infant = family.infant()
+            return [infant.id] if infant else []
         if block.startswith("adult") or block == "bulk_meal_prep":
-            return [a.id for a in family.adults()]
+            return [adult.id for adult in family.adults()]
         return family.member_ids()
 
-    def _fallback_outline(self, week_start: date) -> list[WeekMealOutline]:
-        templates = [
-            ("adult_dinner", "Sheet Pan Lemon Herb Chicken", ["chicken thighs", "broccoli", "potatoes"], 35),
-            ("adult_lunch", "Mediterranean Grain Bowls", ["quinoa", "cucumber", "chickpeas", "feta"], 20),
-            ("adult_breakfast", "Overnight Oats", ["oats", "yogurt", "berries"], 10),
-            ("toddler_school_lunch", "Turkey & Cheese Roll-ups", ["turkey", "tortilla", "cheese"], 10),
-            ("toddler_weekend_lunch", "Mini Quesadillas", ["tortilla", "cheese", "beans"], 15),
-            ("toddler_breakfast", "Banana Pancake Bites", ["banana", "eggs", "oats"], 15),
-            ("infant_blw", "Steamed Broccoli & Avocado Strips", ["broccoli", "avocado"], 10),
-            ("bulk_meal_prep", "Batch Cooked Rice & Roasted Veg", ["rice", "sweet potato", "zucchini"], 40),
-        ]
-        outlines: list[WeekMealOutline] = []
-        for i in range(7):
-            day = DAYS[i]
-            blocks = WEEKDAY_SCHOOL_BLOCKS.get(day, [])
-            for j, block in enumerate(blocks):
-                tmpl = templates[j % len(templates)]
-                outlines.append(
-                    WeekMealOutline(
-                        day=day,
-                        meal_block=block,
-                        title=tmpl[1] if block == tmpl[0] else f"{tmpl[1]} ({block.replace('_', ' ')})",
-                        key_ingredients=list(tmpl[2]),
-                        prep_minutes=tmpl[3],
-                    )
-                )
-        return outlines
-
-    def _fallback_recipe(self, outline: WeekMealOutline) -> MealRecipe:
+    def _fallback_recipe(self, outline: WeekMealOutline, blw: BLWSafety) -> MealRecipe:
         from mealprepper.models.meals import Ingredient
 
         ingredients = [
             Ingredient(name=name, quantity="1", unit="portion", category="other")
             for name in outline.key_ingredients
         ]
+        infant_guidance = ""
+        toddler_modifications = ""
+        if outline.meal_block == "infant_blw":
+            infant_guidance = blw.infant_guidance_for_outline(outline.title, outline.key_ingredients)
+        elif outline.meal_block.startswith("toddler"):
+            toddler_modifications = "No spice; cut into bite-sized pieces."
         return MealRecipe(
             title=outline.title,
-            description=f"Fallback recipe for {outline.meal_block}",
+            description=f"{outline.meal_block.replace('_', ' ').title()} — {outline.title}",
             prep_minutes=outline.prep_minutes,
             cook_minutes=20,
             ingredients=ingredients,
             steps=[RecipeStep(order=1, instruction="Prepare and serve.", duration_minutes=20)],
             tags=["fallback"],
-            infant_guidance="Offer soft, finger-sized pieces appropriate for BLW.",
-            toddler_modifications="Skip spice; cut into bite-sized pieces.",
+            infant_guidance=infant_guidance,
+            toddler_modifications=toddler_modifications,
         )

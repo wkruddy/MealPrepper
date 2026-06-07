@@ -23,6 +23,54 @@ mealprepper init-db
 ```
 
 Family constraints live in `config/family.yaml`. App defaults in `config/default.yaml`.
+Meal templates and BLW safety rules live in `config/meal_catalog.yaml` and `config/blw.yaml`.
+Edit `config/pantry.yaml` for spices and staples you already keep on hand — they won't appear on the shopping list.
+
+### Pantry config (`config/pantry.yaml`)
+
+The grocery list is split into three sections:
+
+1. **Shop for recipes** — unique or recipe-specific items (salmon, feta, deli turkey, etc.) with shoppable quantities (e.g. "2 lb" not "1 portion")
+2. **Weekly staples** — common items you buy most weeks (milk, eggs, bread) listed separately as "buy if low"
+3. **Already in pantry** — spices, oils, and pantry items you keep stocked; excluded from shopping
+
+Edit the YAML to match your kitchen:
+
+```yaml
+on_hand:
+  spices:
+    - salt
+    - cinnamon
+  oils_and_condiments:
+    - olive oil
+  pantry:
+    - rice
+    - pasta
+
+weekly_staples:
+  - milk
+  - eggs
+  - bread
+```
+
+Similar ingredient names are merged automatically (e.g. "Greek yogurt" + "yogurt" → one line). Vague recipe quantities like "1 portion" are converted to sensible buy amounts using a built-in lookup table.
+
+### Cook efficiency (`config/default.yaml`)
+
+Meal planning prioritizes **fewer cook sessions** over maximum variety when `cook_efficiency.enabled` is true:
+
+- **~4 unique adult dinners** per week; other nights repeat those meals
+- **Monday dinner → Tuesday lunch** leftovers (same recipe, no second cook)
+- Saturday `bulk_meal_prep` should align with weekday components
+
+Verify reuse after planning:
+
+```bash
+mealprepper show-plan -t -s          # titles + synergy inline
+mealprepper show-synergy             # full cook-efficiency report
+```
+
+Tune in `config/default.yaml` under `planning.cook_efficiency` (`max_dinner_cook_sessions`, `cross_block_reuse`, etc.).
 
 ## Weekly Workflow
 
@@ -39,7 +87,9 @@ Family constraints live in `config/family.yaml`. App defaults in `config/default
 mealprepper init-db
 mealprepper plan-week --auto-approve   # skip SMS approval for first run
 mealprepper show-plan --markdown
+mealprepper show-plan --titles-only   # quick scan: meal names only
 mealprepper generate-grocery
+mealprepper show-grocery --markdown
 ```
 
 Without `--auto-approve`, the plan stays `pending_approval` until you run:
@@ -58,9 +108,11 @@ mealprepper approve-plan
 | `plan-week [--week-start YYYY-MM-DD] [--auto-approve]` | Generate weekly meal plan |
 | `approve-plan [--plan-id ID]` | Manually approve pending plan |
 | `generate-grocery [--plan-id ID]` | Build grocery list from approved plan |
+| `show-grocery [--plan-id ID] [--markdown]` | Display latest grocery list (recipe items, weekly staples, pantry assumed) |
 | `send-daily [--date YYYY-MM-DD]` | Send morning meal summary SMS |
 | `process-feedback [-m MESSAGE]` | Apply pending feedback or parse inbound SMS |
-| `show-plan [--plan-id ID] [--markdown]` | Display plan table or playbook |
+| `show-plan [--plan-id ID] [--markdown] [--titles-only] [--synergy]` | Display plan, meal names only, or include synergy report |
+| `show-synergy [--plan-id ID] [--markdown]` | Cook reuse links, shared ingredients, synergy notes |
 | `watch-messages` | Stub for inbound SMS webhook |
 
 Also: `python -m mealprepper <command>`

@@ -1,9 +1,11 @@
 from datetime import date
 
-from mealprepper.models.grocery import GroceryCategory, GroceryItem, GroceryList
+from mealprepper.models.grocery import GroceryCategory
 from mealprepper.models.meals import Ingredient, MealRecipe, PlannedMeal
 from mealprepper.models.plans import WeeklyPlan
 from mealprepper.skills.grocery_builder import GroceryBuilderSkill
+from mealprepper.skills.grocery_normalizer import GroceryNormalizer, canonicalize_name, normalize_grocery_category
+from mealprepper.skills.pantry_config import PantryConfig
 
 
 def _plan_with_meals() -> WeeklyPlan:
@@ -18,8 +20,9 @@ def _plan_with_meals() -> WeeklyPlan:
                 recipe=MealRecipe(
                     title="Sheet Pan Chicken",
                     ingredients=[
-                        Ingredient(name="chicken thighs", quantity="2", unit="lb", category="meat"),
-                        Ingredient(name="broccoli", quantity="1", unit="head", category="produce"),
+                        Ingredient(name="chicken thighs", quantity="1", unit="portion", category="meat"),
+                        Ingredient(name="broccoli", quantity="1", unit="portion", category="produce"),
+                        Ingredient(name="salt", quantity="to taste", unit="", category="spices"),
                     ],
                 ),
             ),
@@ -29,8 +32,10 @@ def _plan_with_meals() -> WeeklyPlan:
                 recipe=MealRecipe(
                     title="Grain Bowl",
                     ingredients=[
-                        Ingredient(name="broccoli", quantity="2", unit="cups", category="produce"),
+                        Ingredient(name="broccoli", quantity="1", unit="portion", category="produce"),
                         Ingredient(name="quinoa", quantity="1", unit="cup", category="pantry"),
+                        Ingredient(name="Greek yogurt", quantity="1", unit="portion", category="dairy"),
+                        Ingredient(name="yogurt", quantity="1", unit="portion", category="dairy"),
                     ],
                 ),
             ),
@@ -42,33 +47,49 @@ def test_build_grocery_list_fallback_without_ollama():
     builder = GroceryBuilderSkill()
     grocery = builder.build(_plan_with_meals())
     assert grocery.weekly_plan_id == "test-plan"
-    assert len(grocery.items) >= 3
+    assert len(grocery.items) >= 2
     assert grocery.ready_for_shopping
+    assert "salt" in [name.lower() for name in grocery.pantry_assumed]
 
 
-def test_render_text_groups_by_category():
+def test_render_text_groups_sections():
     builder = GroceryBuilderSkill()
-    grocery = GroceryList(
-        week_label="2025-06-02 — 2025-06-08",
-        items=[
-            GroceryItem(
-                name="broccoli",
-                quantity="1",
-                category=GroceryCategory.PRODUCE,
-            ),
+    normalizer = GroceryNormalizer()
+    grocery = normalizer.build_shopping_list(
+        [
+            Ingredient(name="salmon", quantity="1", unit="portion", category="meat"),
+            Ingredient(name="milk", quantity="1", unit="portion", category="dairy"),
+            Ingredient(name="cinnamon", quantity="1", unit="tsp", category="spices"),
         ],
+        "2025-06-02 — 2025-06-08",
     )
     text = builder.render_text(grocery)
-    assert "Grocery List" in text
-    assert "broccoli" in text
-    assert "Produce" in text
+    assert "Shop for recipes" in text
+    assert "Weekly staples" in text
+    assert "Already in pantry" in text
+    assert "Salmon" in text or "salmon" in text.lower()
 
 
-def test_from_ingredients_dedupes():
-    ingredients = [
-        Ingredient(name="Broccoli", quantity="1", category="produce"),
-        Ingredient(name="broccoli", quantity="2 cups", category="produce"),
-    ]
-    grocery = GroceryList.from_ingredients(ingredients, week_label="test")
-    assert len(grocery.items) == 1
-    assert "1" in grocery.items[0].quantity and "2 cups" in grocery.items[0].quantity
+def test_canonicalize_merges_yogurt_variants():
+    assert canonicalize_name("Greek yogurt") == canonicalize_name("yogurt")
+
+
+def test_normalize_grocery_category_aliases():
+    assert normalize_grocery_category("vegetable") == GroceryCategory.PRODUCE
+    assert normalize_grocery_category("grain") == GroceryCategory.PANTRY
+
+
+def test_normalizer_uses_shoppable_quantities():
+    normalizer = GroceryNormalizer()
+    grocery = normalizer.build_shopping_list(
+        [Ingredient(name="eggs", quantity="1", unit="portion", category="dairy")],
+        "test-week",
+    )
+    eggs = next(i for i in grocery.weekly_staples if "egg" in i.name.lower())
+    assert "dozen" in eggs.quantity.lower()
+
+
+def test_pantry_config_matches_spices():
+    pantry = PantryConfig(on_hand={"cinnamon", "salt"}, weekly_staples={"milk"})
+    assert pantry.matches_on_hand("ground cinnamon")
+    assert pantry.matches_weekly_staple("whole milk")

@@ -45,15 +45,20 @@ class InventorySkill:
         return InventoryItem(name=name, quantity=quantity, category=category)
 
     def subtract_from_grocery(self, grocery_items: list, inventory: list[InventoryItem] | None = None) -> list:
-        """Remove items already in inventory from grocery list (by name match)."""
+        """Remove items already in inventory or pantry config from grocery list."""
+        from mealprepper.config import get_settings
+        from mealprepper.skills.pantry_config import PantryConfig
+
+        pantry = PantryConfig.from_settings(get_settings())
         inv = inventory or self.list_items()
         inv_names = {i.name.lower().strip() for i in inv}
         remaining = []
         for item in grocery_items:
-            if item.name.lower().strip() not in inv_names:
-                remaining.append(item)
-            else:
-                logger.info("Skipping %s — already in inventory", item.name)
+            name = item.name.lower().strip()
+            if name in inv_names or pantry.matches_on_hand(item.name):
+                logger.info("Skipping %s — pantry/inventory", item.name)
+                continue
+            remaining.append(item)
         return remaining
 
     def to_prompt_context(self) -> str:

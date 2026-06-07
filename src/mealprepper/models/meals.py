@@ -40,6 +40,9 @@ class PlannedMeal(BaseModel):
     recipe: MealRecipe
     member_ids: list[str] = Field(default_factory=list)
     notes: str = ""
+    cook_source_day: str | None = None
+    cook_source_block: str | None = None
+    cook_note: str = ""
 
 
 class MealCandidate(BaseModel):

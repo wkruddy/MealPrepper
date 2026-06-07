@@ -24,6 +24,7 @@ class WeeklyPlan(BaseModel):
     status: PlanStatus = PlanStatus.DRAFT
     meals: list[PlannedMeal] = Field(default_factory=list)
     synergy_notes: str = ""
+    synergy_suggestions: list[str] = Field(default_factory=list)
     created_at: datetime | None = None
     approved_at: datetime | None = None
     playbook_markdown: str = ""

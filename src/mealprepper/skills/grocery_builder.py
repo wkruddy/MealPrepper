@@ -1,108 +1,159 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from mealprepper.llm.ollama_client import OllamaClient, OllamaUnavailableError
-from mealprepper.models.grocery import GroceryCategory, GroceryItem, GroceryList
+from mealprepper.models.grocery import GroceryList
 from mealprepper.models.plans import WeeklyPlan
+from mealprepper.skills.grocery_normalizer import GroceryNormalizer
 from mealprepper.skills.ingredient_synergy import IngredientSynergySkill
 
 logger = logging.getLogger(__name__)
 
 
-class GroceryBuildResult(BaseModel):
-    items: list[GroceryItem] = Field(default_factory=list)
+class GroceryNotesResult(BaseModel):
     synergy_notes: str = ""
     shopping_tips: list[str] = Field(default_factory=list)
 
+    @field_validator("shopping_tips", mode="before")
+    @classmethod
+    def normalize_shopping_tips(cls, value: str | list[str] | None) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            tips = []
+            for line in value.replace(";", "\n").splitlines():
+                cleaned = line.strip().lstrip("0123456789.) ")
+                if cleaned:
+                    tips.append(cleaned)
+            return tips
+        return value
+
 
 class GroceryBuilderSkill:
-    """Build a consolidated grocery list from the weekly plan."""
+    """Build a consolidated, human-friendly grocery list from the weekly plan."""
 
-    SYSTEM = """You build efficient grocery lists for a family of 4 (2 adults, toddler, infant).
-Consolidate duplicate ingredients, assign store categories (produce, dairy, meat, pantry, frozen, spices, other),
-and note which meals use each item. Quantities should be practical for one week."""
+    SYSTEM = """You help a family shop for one week of meals.
+Review the consolidated ingredient list and return brief synergy_notes (ingredient overlap, waste reduction)
+and shopping_tips (array of short strings). Do NOT return the item list — quantities are handled separately."""
 
     def __init__(
         self,
         llm: OllamaClient | None = None,
         synergy: IngredientSynergySkill | None = None,
+        normalizer: GroceryNormalizer | None = None,
     ) -> None:
         self.llm = llm or OllamaClient()
         self.synergy = synergy or IngredientSynergySkill()
+        self.normalizer = normalizer or GroceryNormalizer()
 
     def build(self, plan: WeeklyPlan) -> GroceryList:
         ingredients = self.synergy.consolidate_ingredients(plan.meals)
         week_label = f"{plan.week_start.isoformat()} — {plan.week_end.isoformat()}"
+        synergy_notes = plan.synergy_notes or ""
 
         try:
-            meal_map = {m.recipe.title: f"{m.day}/{m.meal_block}" for m in plan.meals}
-            prompt = f"""Build a grocery list JSON object with fields:
-items (array of name, quantity, unit, category, used_in_meals, notes),
-synergy_notes, shopping_tips.
+            prompt = f"""Review this week's ingredients and suggest shopping synergy notes.
 
 Week: {week_label}
-Synergy context: {plan.synergy_notes}
+Existing synergy notes: {synergy_notes or 'none'}
 
-Raw ingredients:
+Consolidated ingredients:
 {self._format_ingredients(ingredients)}
 
-Meals using ingredients:
-{chr(10).join(f'- {k}: {v}' for k, v in list(meal_map.items())[:15])}"""
+Return JSON with synergy_notes (string) and shopping_tips (array of strings)."""
 
             result = self.llm.chat_json(
                 [
                     {"role": "system", "content": self.SYSTEM},
                     {"role": "user", "content": prompt},
                 ],
-                GroceryBuildResult,
+                GroceryNotesResult,
             )
-            items = result.items
-            synergy_notes = result.synergy_notes
+            if result.synergy_notes:
+                synergy_notes = result.synergy_notes
+            if result.shopping_tips:
+                tips = " ".join(result.shopping_tips)
+                synergy_notes = f"{synergy_notes}\n\nShopping tips: {tips}".strip()
         except (OllamaUnavailableError, ValueError) as exc:
-            logger.warning("Grocery LLM failed, using consolidation: %s", exc)
-            base = GroceryList.from_ingredients(ingredients, week_label=week_label)
-            items = base.items
-            synergy_notes = plan.synergy_notes or "Consolidated from weekly plan ingredients."
+            logger.warning("Grocery notes LLM failed, using plan synergy only: %s", exc)
 
-        for item in items:
-            if isinstance(item.category, str):
-                try:
-                    item.category = GroceryCategory(item.category)
-                except ValueError:
-                    item.category = GroceryCategory.OTHER
-
-        return GroceryList(
+        grocery = self.normalizer.build_shopping_list(
+            ingredients,
+            week_label,
             weekly_plan_id=plan.id,
-            week_label=week_label,
-            items=items,
             synergy_notes=synergy_notes,
-            ready_for_shopping=True,
         )
+        logger.info(
+            "Grocery list: %d to buy, %d staples, %d pantry assumed",
+            len(grocery.must_buy),
+            len(grocery.weekly_staples),
+            len(grocery.pantry_assumed),
+        )
+        return grocery
 
     def render_text(self, grocery: GroceryList) -> str:
         lines = [f"# Grocery List — {grocery.week_label}", ""]
         if grocery.synergy_notes:
             lines.append(f"_{grocery.synergy_notes}_\n")
 
-        by_cat: dict[str, list[GroceryItem]] = {}
-        for item in grocery.items:
+        must_buy = grocery.must_buy or [i for i in grocery.items if i.section == "must_buy"]
+        weekly_staples = grocery.weekly_staples or [
+            i for i in grocery.items if i.section == "weekly_staple"
+        ]
+
+        if must_buy:
+            lines.append("## Shop for recipes")
+            lines.append("_Unique or recipe-specific items to pick up._\n")
+            lines.extend(self._render_section(must_buy))
+            lines.append("")
+
+        if weekly_staples:
+            lines.append("## Weekly staples")
+            lines.append("_Buy if you're running low — used across multiple meals._\n")
+            lines.extend(self._render_section(weekly_staples))
+            lines.append("")
+
+        if grocery.pantry_assumed:
+            lines.append("## Already in pantry")
+            lines.append("_Not on the shopping list — we assumed you have these:_\n")
+            pantry = ", ".join(grocery.pantry_assumed)
+            lines.append(f"{pantry}\n")
+
+        return "\n".join(lines).strip() + "\n"
+
+    def _render_section(self, items: list) -> list[str]:
+        by_cat: dict[str, list] = defaultdict(list)
+        for item in items:
             cat = item.category.value if hasattr(item.category, "value") else str(item.category)
             by_cat.setdefault(cat, []).append(item)
 
+        rendered: list[str] = []
         for cat in sorted(by_cat.keys()):
-            lines.append(f"## {cat.title()}")
+            rendered.append(f"### {cat.title()}")
             for item in by_cat[cat]:
-                qty = f" — {item.quantity} {item.unit}".strip()
-                lines.append(f"- [ ] {item.name}{qty}")
-                if item.used_in_meals:
-                    lines.append(f"  - Used in: {', '.join(item.used_in_meals[:3])}")
-            lines.append("")
-        return "\n".join(lines)
+                qty = self._format_shop_line(item)
+                rendered.append(f"- [ ] {qty}")
+                if item.notes:
+                    rendered.append(f"  - {item.notes}")
+            rendered.append("")
+        return rendered
+
+    @staticmethod
+    def _format_shop_line(item) -> str:
+        qty = item.quantity.strip()
+        unit = item.unit.strip()
+        if unit and unit not in qty:
+            qty = f"{qty} {unit}".strip()
+        if qty:
+            return f"{item.name} — {qty}"
+        return item.name
 
     def _format_ingredients(self, ingredients) -> str:
         return "\n".join(
-            f"- {i.name}: {i.quantity} {i.unit} ({i.category})" for i in ingredients
+            f"- {i.name}: {i.quantity} {i.unit} ({i.category})".strip()
+            for i in ingredients
         )

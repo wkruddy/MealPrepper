@@ -6,7 +6,8 @@ from datetime import date, timedelta
 from mealprepper.models.family import FamilyProfile
 from mealprepper.models.meals import PlannedMeal
 from mealprepper.models.plans import WeeklyPlan, PlanStatus
-from mealprepper.skills.meal_finder import DAYS, MealFinderSkill, WeekMealOutline
+from mealprepper.skills.meal_blocks import DAYS
+from mealprepper.skills.meal_finder import MealFinderSkill
 
 logger = logging.getLogger(__name__)
 

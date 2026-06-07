@@ -1,0 +1,79 @@
+# Baby-led weaning guidance by age (months).
+# Used to validate infant_blw meals and enrich LLM prompts.
+
+age_brackets:
+  - max_months: 8
+    label: "6-8 months"
+    guidance: |
+      Offer soft, finger-length strips the infant can grasp. Food should squish between fingers.
+      Prioritize iron-rich options (soft meat strips, egg, legumes) alongside familiar fruits/veg.
+    allowed_foods:
+      - avocado
+      - banana
+      - sweet potato
+      - broccoli
+      - zucchini
+      - green beans
+      - peas
+      - oats
+      - yogurt
+      - soft scrambled egg
+      - ground meat
+      - salmon
+      - hummus
+      - toast strips
+      - cucumber
+      - pear
+      - mango
+    caution_foods:
+      - egg
+      - peanut
+      - tree nuts
+      - dairy
+      - wheat
+      - soy
+      - fish
+      - shellfish
+    avoid_foods:
+      - honey
+      - whole nuts
+      - whole grapes
+      - cherry tomatoes
+      - raw apple
+      - raw carrot
+      - popcorn
+      - sausages
+      - bacon
+      - added salt
+      - added sugar
+
+  - max_months: 12
+    label: "8-12 months"
+    guidance: |
+      Continue soft finger foods; introduce more textures as tolerated. Quarter grapes and cherry tomatoes.
+    allowed_foods:
+      - avocado
+      - banana
+      - sweet potato
+      - broccoli
+      - chicken
+      - turkey
+      - beef
+      - pasta
+      - rice
+      - cheese
+      - berries
+      - melon
+      - beans
+      - lentils
+    caution_foods:
+      - egg
+      - peanut
+      - dairy
+      - citrus
+    avoid_foods:
+      - honey
+      - whole nuts
+      - whole grapes
+      - raw hard vegetables
+      - popcorn

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import Counter
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from mealprepper.config import get_settings
 from mealprepper.context.budget import CallType, load_context_budget
@@ -15,11 +15,71 @@ from mealprepper.models.plans import WeeklyPlan
 logger = logging.getLogger(__name__)
 
 
+def _normalize_synergy_text(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, list):
+        parts = [_normalize_synergy_text(item) for item in value]
+        return "; ".join(part for part in parts if part)
+    if isinstance(value, dict):
+        for key in ("text", "description", "suggestion", "message", "note", "content", "detail"):
+            if key in value and value[key]:
+                text = _normalize_synergy_text(value[key])
+                if text:
+                    return text
+        label = str(value.get("type", "")).replace("_", " ").strip().title()
+        body_parts = [
+            str(item).strip()
+            for item in value.values()
+            if isinstance(item, str) and item.strip()
+        ]
+        if label and body_parts:
+            return f"{label}: {body_parts[0]}"
+        if body_parts:
+            return body_parts[0]
+        if label:
+            return label
+        return str(value).strip()
+    return str(value).strip()
+
+
+def _normalize_string_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [
+            line.strip().lstrip("0123456789.) ")
+            for line in value.replace(";", "\n").splitlines()
+            if line.strip()
+        ]
+    if not isinstance(value, list):
+        text = _normalize_synergy_text(value)
+        return [text] if text else []
+    items: list[str] = []
+    for item in value:
+        text = _normalize_synergy_text(item)
+        if text:
+            items.append(text)
+    return items
+
+
 class SynergyReport(BaseModel):
     shared_ingredients: list[str] = Field(default_factory=list)
     waste_risks: list[str] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
     notes: str = ""
+
+    @field_validator("shared_ingredients", "waste_risks", "suggestions", mode="before")
+    @classmethod
+    def normalize_list_fields(cls, value: object) -> list[str]:
+        return _normalize_string_list(value)
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def normalize_notes(cls, value: object) -> str:
+        return _normalize_synergy_text(value)
 
 
 class IngredientSynergySkill:
@@ -55,7 +115,9 @@ Identify shared produce/proteins, flag items used only once, and suggest swaps t
             builder.add_section("Meals", self._meal_summary(plan.meals), priority=20)
             builder.add_section(
                 "Output",
-                "Return JSON: shared_ingredients, waste_risks, suggestions (array), notes.",
+                "Return JSON with string fields only: "
+                "shared_ingredients (array of strings), waste_risks (array of strings), "
+                "suggestions (array of plain-text strings), notes (single string).",
                 priority=5,
             )
 
@@ -98,6 +160,7 @@ Identify shared produce/proteins, flag items used only once, and suggest swaps t
 
     def apply_synergy_notes(self, plan: WeeklyPlan, report: SynergyReport) -> WeeklyPlan:
         plan.synergy_notes = report.notes or "; ".join(report.suggestions)
+        plan.synergy_suggestions = list(report.suggestions)
         if report.suggestions:
             plan.playbook_markdown += "\n\n## Ingredient Synergy\n"
             for s in report.suggestions:

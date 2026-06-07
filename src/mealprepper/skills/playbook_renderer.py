@@ -35,6 +35,26 @@ class PlaybookRendererSkill:
                 lines.extend(self._meal_section(meal))
         return "\n".join(lines)
 
+    def render_titles_only(self, plan: WeeklyPlan) -> str:
+        """Compact week view with meal block labels and recipe titles only."""
+        lines = [
+            f"# Week {plan.week_start} — {plan.week_end}",
+            "",
+        ]
+        for day in DAYS:
+            day_meals = [m for m in plan.meals if m.day == day]
+            if not day_meals:
+                continue
+            lines.append(f"## {day.title()}")
+            for meal in day_meals:
+                block = meal.meal_block.replace("_", " ").title()
+                line = f"- **{block}:** {meal.recipe.title}"
+                if meal.cook_note:
+                    line += f" _({meal.cook_note})_"
+                lines.append(line)
+            lines.append("")
+        return "\n".join(lines).strip() + "\n"
+
     def render_approval_summary(self, plan: WeeklyPlan, max_meals: int = 12) -> str:
         lines = [
             f"Week {plan.week_start} — {plan.week_end}",

@@ -26,6 +26,7 @@ class GroceryItem(BaseModel):
     used_in_meals: list[str] = Field(default_factory=list)
     checked: bool = False
     notes: str = ""
+    section: str = "must_buy"  # must_buy | weekly_staple | pantry
 
 
 class GroceryList(BaseModel):
@@ -33,6 +34,9 @@ class GroceryList(BaseModel):
     weekly_plan_id: str | None = None
     week_label: str = ""
     items: list[GroceryItem] = Field(default_factory=list)
+    must_buy: list[GroceryItem] = Field(default_factory=list)
+    weekly_staples: list[GroceryItem] = Field(default_factory=list)
+    pantry_assumed: list[str] = Field(default_factory=list)
     synergy_notes: str = ""
     created_at: datetime | None = None
     ready_for_shopping: bool = False

@@ -1,0 +1,53 @@
+# Pantry & staples — edit to match your kitchen.
+# Items in on_hand are excluded from the shopping list.
+# weekly_staples appear in a separate "buy if low" section with sensible quantities.
+
+on_hand:
+  spices:
+    - salt
+    - black pepper
+    - pepper
+    - cinnamon
+    - garlic powder
+    - paprika
+    - cumin
+    - oregano
+    - baking powder
+    - baking soda
+  oils_and_condiments:
+    - olive oil
+    - vegetable oil
+    - soy sauce
+    - vinegar
+    - lemon juice
+    - honey
+    - salsa
+  pantry:
+    - flour
+    - sugar
+    - rice
+    - pasta
+    - oats
+    - rolled oats
+    - quinoa
+    - broth
+    - canned beans
+    - black beans
+    - chickpeas
+    - lentils
+    - tomato soup
+
+weekly_staples:
+  - milk
+  - almond milk
+  - eggs
+  - butter
+  - bread
+  - whole grain bread
+  - yogurt
+  - greek yogurt
+  - bananas
+  - onions
+  - garlic
+  - cheese
+  - tortillas

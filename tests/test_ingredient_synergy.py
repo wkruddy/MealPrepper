@@ -2,7 +2,7 @@ from datetime import date
 
 from mealprepper.models.meals import Ingredient, MealRecipe, PlannedMeal
 from mealprepper.models.plans import WeeklyPlan
-from mealprepper.skills.ingredient_synergy import IngredientSynergySkill
+from mealprepper.skills.ingredient_synergy import IngredientSynergySkill, SynergyReport
 
 
 def _meal(day: str, title: str, ingredients: list[str]) -> PlannedMeal:
@@ -55,3 +55,26 @@ def test_apply_synergy_notes_updates_plan():
     updated = skill.apply_synergy_notes(plan, report)
     assert updated.synergy_notes
     assert "Ingredient Synergy" in updated.playbook_markdown
+
+
+def test_synergy_report_normalizes_structured_llm_output():
+    report = SynergyReport.model_validate(
+        {
+            "suggestions": [
+                {
+                    "type": "ingredient_swap",
+                    "description": "Use leftover turkey in wraps to reduce waste.",
+                },
+                {"type": "combine_meals", "text": "Serve salmon over beef and broccoli."},
+            ],
+            "notes": [
+                "Toddler meals reuse cucumber and oregano to reduce waste.",
+                "Batch cook grains on Saturday.",
+            ],
+        }
+    )
+    assert len(report.suggestions) == 2
+    assert "turkey" in report.suggestions[0].lower()
+    assert "salmon" in report.suggestions[1].lower()
+    assert "Toddler meals" in report.notes
+    assert "Batch cook" in report.notes
