@@ -94,12 +94,22 @@ class CommunicationsAgent(BaseAgent):
                 return AgentResult(success=True, message="Plan rejected — revise and re-plan")
 
         plan = self.store.get_plan_for_date(date.today())
-        meal_title = self.feedback.suggest_meal_for_feedback(plan)
-        fb = self.run_tool("parse_feedback", text=text, meal_title=meal_title)
+        meal_ctx = self.feedback.suggest_meal_for_feedback(plan)
+        fb = self.run_tool(
+            "parse_feedback",
+            text=text,
+            meal_title=meal_ctx.meal_title,
+            meal_block=meal_ctx.meal_block,
+            day=meal_ctx.day,
+        )
         if fb:
             saved = self.store.save_feedback(fb)
             self.run_tool("process_preferences")
-            return AgentResult(success=True, message=f"Feedback recorded: {saved.rating.value}", data=saved)
+            return AgentResult(
+                success=True,
+                message=self.formatter.format_feedback_ack(saved.meal_title, saved.rating.value),
+                data=saved,
+            )
         return AgentResult(success=False, message="Could not parse message")
 
     def process_pending_feedback(self) -> AgentResult:

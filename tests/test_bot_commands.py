@@ -7,6 +7,7 @@ from mealprepper.models.recipe_repository import SavedRecipe
 from mealprepper.skills.comms.bot_commands import (
     MealPrepperBotHandler,
     parse_command_text,
+    recipe_match_score,
     strip_bot_mention,
 )
 
@@ -173,8 +174,66 @@ def test_confirm_plan_week_defers_execution():
     assert "C123" not in handler._pending
 
 
+def test_recipe_match_score_prefers_planned_title():
+    assert recipe_match_score("hummus veggie pinwheels", "Hummus Veggie Pinwheels") == 1000
+    assert recipe_match_score("hummus veggie pinwheels", "Quesadilla Sheet Bake") == 0
+
+
+def test_recipe_prefers_planned_meal_over_saved_library():
+    supervisor = MagicMock()
+    plan = WeeklyPlan(
+        week_start=date(2026, 6, 9),
+        week_end=date(2026, 6, 15),
+        status=PlanStatus.APPROVED,
+        meals=[
+            PlannedMeal(
+                day="tuesday",
+                meal_block="toddler_school_lunch",
+                recipe=MealRecipe(
+                    title="Hummus Veggie Pinwheels",
+                    steps=[RecipeStep(order=1, instruction="Roll pinwheels")],
+                ),
+            )
+        ],
+    )
+    supervisor.store.get_plan_for_date.return_value = plan
+    saved = SavedRecipe(
+        id="wrong",
+        title="Quesadilla Sheet Bake",
+        recipe=MealRecipe(
+            title="Quesadilla Sheet Bake",
+            steps=[RecipeStep(order=1, instruction="Bake quesadillas")],
+        ),
+    )
+    supervisor.store.get_saved_recipe.return_value = saved
+    recipe_repo = MagicMock()
+    recipe_repo.search.return_value = [MagicMock(recipe_id="wrong", title="Quesadilla Sheet Bake")]
+    handler = MealPrepperBotHandler(supervisor=supervisor, recipe_repo=recipe_repo)
+    reply = handler.handle("recipe hummus veggie pinwheels")
+    assert reply.success
+    assert "Roll pinwheels" in str(reply.blocks)
+    assert "Bake quesadillas" not in str(reply.blocks)
+
+
+def test_grocery_defers_slow_generation():
+    supervisor = MagicMock()
+    plan = WeeklyPlan(
+        week_start=date(2026, 6, 9),
+        week_end=date(2026, 6, 15),
+        status=PlanStatus.APPROVED,
+        meals=[],
+    )
+    supervisor.store.get_latest_plan.return_value = plan
+    handler = MealPrepperBotHandler(supervisor=supervisor, recipe_repo=MagicMock())
+    reply = handler.handle("grocery")
+    assert reply.defer == "grocery"
+    supervisor.generate_grocery.assert_not_called()
+
+
 def test_recipe_shows_saved_steps():
     supervisor = MagicMock()
+    supervisor.store.get_plan_for_date.return_value = None
+    supervisor.store.get_latest_plan.return_value = None
     saved = SavedRecipe(
         id="abc",
         title="Smash Burger",

@@ -161,3 +161,28 @@ INFO mealprepper.agents.base: [weekly_meals] running tool: save_plan
 INFO mealprepper.agents.base: [communications] running tool: format_playbook
 INFO mealprepper.agents.base: [communications] running tool: send_approval
 INFO mealprepper.skills.comms.slack: Slack webhook message sent
+INFO mealprepper.agents.base: [grocery_list] running tool: load_plan
+INFO mealprepper.agents.base: [grocery_list] running tool: build_list
+WARNING mealprepper.llm.ollama_client: Prompt size 6001 exceeds budget 6000 for CallType.WEEK_ORGANIZER — truncating user message
+INFO mealprepper.llm.ollama_client: Ollama request: week_organizer (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: week_organizer (8.6s)
+INFO mealprepper.llm.ollama_client: Ollama request: default (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: default (4.0s)
+INFO mealprepper.skills.grocery_builder: Grocery list: 48 to buy, 9 staples, 22 pantry assumed
+INFO mealprepper.agents.base: [grocery_list] running tool: apply_inventory
+INFO mealprepper.agents.base: [grocery_list] running tool: save_list
+INFO mealprepper.agents.base: [grocery_list] running tool: render_list
+INFO mealprepper.agents.base: [grocery_list] running tool: load_plan
+INFO mealprepper.agents.base: [grocery_list] running tool: build_list
+WARNING mealprepper.llm.ollama_client: Prompt size 6001 exceeds budget 6000 for CallType.WEEK_ORGANIZER — truncating user message
+INFO mealprepper.llm.ollama_client: Ollama request: week_organizer (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: week_organizer (7.1s)
+INFO mealprepper.llm.ollama_client: Ollama request: default (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: default (5.0s)
+INFO mealprepper.skills.grocery_builder: Grocery list: 48 to buy, 9 staples, 22 pantry assumed
+INFO mealprepper.agents.base: [grocery_list] running tool: apply_inventory
+INFO mealprepper.agents.base: [grocery_list] running tool: save_list
+INFO mealprepper.agents.base: [grocery_list] running tool: render_list
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: eac2a8c3-6b45-409e-b04e-7dc957aade47)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: eac2a8c3-6b45-409e-b04e-7dc957aade47)

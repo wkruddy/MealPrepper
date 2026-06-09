@@ -18,7 +18,10 @@ from mealprepper.skills.comms.slack_format import (
 )
 from mealprepper.skills.comms_formatter import CommsFormatterSkill
 from mealprepper.skills.playbook_renderer import PlaybookRendererSkill
+from mealprepper.skills.pantry_config import _normalize_name
 from mealprepper.skills.recipe_repository import RecipeRepositorySkill
+
+MIN_SAVED_RECIPE_MATCH_SCORE = 200
 
 HELP_TEXT = """*MealPrepper commands*
 
@@ -45,7 +48,8 @@ HELP_TEXT = """*MealPrepper commands*
 • `add-recipe Mild turkey tacos — kids love avocado` — save a meal idea
 
 *Feedback*
-• `loved chicken tacos` / `liked` / `disliked` / `neutral`
+• `loved chicken tacos` / `liked` / `disliked` / `neutral` / `reject`
+• Feedback is saved and applied to future meal plans automatically
 
 *Usage*
 • Type commands in this channel, mention @MealPrepper, or use `/mealprepper <command>`
@@ -88,6 +92,24 @@ class BotReply:
 
 def strip_bot_mention(text: str) -> str:
     return re.sub(r"<@[A-Z0-9]+>", "", text).strip()
+
+
+def recipe_match_score(query: str, title: str) -> int:
+    """Score how well a query matches a recipe title (higher is better)."""
+    normalized_query = _normalize_name(query)
+    normalized_title = _normalize_name(title)
+    if not normalized_query or not normalized_title:
+        return 0
+    if normalized_query == normalized_title:
+        return 1000
+    if normalized_query in normalized_title or normalized_title in normalized_query:
+        return 500 + len(normalized_query)
+    query_tokens = set(normalized_query.split())
+    title_tokens = set(normalized_title.split())
+    overlap = len(query_tokens & title_tokens)
+    if overlap == 0:
+        return 0
+    return overlap * 100
 
 
 def parse_command_text(text: str) -> tuple[str, str]:
@@ -184,11 +206,20 @@ class MealPrepperBotHandler:
                 "I didn't understand that. Try `help`, `approve`, `status`, or `loved <meal>`.",
                 success=False,
             )
-        return BotReply("\n".join(state.messages), success=True)
+        reply_text = state.messages[-1]
+        if command in {"loved", "liked", "disliked", "neutral", "reject"}:
+            builder = SlackMessageBuilder()
+            builder.section(f":thumbsup: {reply_text}")
+            builder.context("This will inform next week's meal plan.")
+            payload = builder.to_payload()
+            return BotReply(payload["text"], success=True, blocks=payload["blocks"])
+        return BotReply(reply_text, success=True)
 
     def run_deferred(self, action: str) -> BotReply:
         if action == "plan-week":
             return self._execute_plan_week()
+        if action == "grocery":
+            return self._execute_grocery()
         return BotReply(f"Unknown deferred action: {action}", success=False)
 
     def _handle_approval(self, *, approve: bool) -> BotReply:
@@ -409,6 +440,15 @@ class MealPrepperBotHandler:
         return BotReply(payloads[0]["text"], payloads=payloads)
 
     def _handle_grocery(self) -> BotReply:
+        error = self._grocery_precheck()
+        if error:
+            return error
+        return BotReply(
+            ":hourglass_flowing_sand: Building grocery list — I'll post it when ready.",
+            defer="grocery",
+        )
+
+    def _grocery_precheck(self) -> BotReply | None:
         plan = self.store.get_latest_plan(PlanStatus.APPROVED) or self.store.get_latest_plan()
         if not plan:
             return BotReply("No plan found.", success=False)
@@ -417,6 +457,12 @@ class MealPrepperBotHandler:
                 f"Plan is `{plan.status.value}` — approve it first with `approve`.",
                 success=False,
             )
+        return None
+
+    def _execute_grocery(self) -> BotReply:
+        plan = self.store.get_latest_plan(PlanStatus.APPROVED) or self.store.get_latest_plan()
+        if not plan:
+            return BotReply("No plan found.", success=False)
 
         state = self.supervisor.generate_grocery(plan_id=plan.id)
         if state.last_error:
@@ -473,19 +519,21 @@ class MealPrepperBotHandler:
         if not query.strip():
             return BotReply("Usage: `recipe <name>` — e.g. `recipe smash burger`", success=False)
 
-        saved = self._find_saved_recipe(query)
-        if saved:
-            return self._recipe_reply_from_saved(saved)
-
-        plan = self._resolve_plan_for_view()
+        plan = self.store.get_plan_for_date(date.today()) or self._resolve_plan_for_view()
         if plan:
             meal = self._find_planned_meal(plan, query)
             if meal:
                 builder = SlackMessageBuilder()
                 builder.header(f"{meal.day.title()} · {meal.recipe.title}")
+                builder.context("_From this week's meal plan_")
+                builder.divider()
                 builder.section(format_planned_meal_recipe(meal))
                 payload = builder.to_payload()
                 return BotReply(payload["text"], blocks=payload["blocks"])
+
+        saved = self._find_saved_recipe(query)
+        if saved:
+            return self._recipe_reply_from_saved(saved)
 
         return BotReply(f"No saved or planned recipe matches *{query}*.", success=False)
 
@@ -539,15 +587,26 @@ class MealPrepperBotHandler:
         return BotReply(payload["text"], blocks=payload["blocks"])
 
     def _find_saved_recipe(self, query: str) -> SavedRecipe | None:
-        results = self.recipe_repo.search(query, top_k=5)
-        if not results:
+        results = self.recipe_repo.search(query, top_k=8)
+        best_id = ""
+        best_score = 0
+        for result in results:
+            score = recipe_match_score(query, result.title)
+            if score > best_score:
+                best_score = score
+                best_id = result.recipe_id
+        if best_score < MIN_SAVED_RECIPE_MATCH_SCORE:
             return None
-        top = results[0]
-        return self.store.get_saved_recipe(top.recipe_id)
+        return self.store.get_saved_recipe(best_id)
 
     def _find_planned_meal(self, plan, query: str):
-        normalized = query.lower().strip()
+        best_meal = None
+        best_score = 0
         for meal in plan.meals:
-            if normalized in meal.recipe.title.lower():
-                return meal
-        return None
+            score = recipe_match_score(query, meal.recipe.title)
+            if score > best_score:
+                best_score = score
+                best_meal = meal
+        if best_score < 100:
+            return None
+        return best_meal

@@ -144,7 +144,14 @@ systemctl --user enable --now mealprepper-watch-messages.service
 systemctl --user status mealprepper-watch-messages.service
 ```
 
-Logs: `data/logs/watch-messages.log`
+Logs (systemd service):
+- `data/logs/watch-messages.log` — startup banner (stdout)
+- `data/logs/watch-messages.err` — command traffic, LLM calls, errors (stderr)
+
+```bash
+tail -F data/logs/watch-messages.log data/logs/watch-messages.err
+# or: logsMPBot  (if alias is in ~/.bashrc)
+```
 
 ## Troubleshooting
 
@@ -154,6 +161,8 @@ Logs: `data/logs/watch-messages.log`
 | Bot never replies | Check `SLACK_CHANNEL_ID` matches; verify Event Subscriptions |
 | `missing_scope` | Reinstall app after adding bot scopes |
 | Outbound works, inbound doesn't | Webhook ≠ bot — need `watch-messages` + bot tokens |
+| Slash command "did not respond" | Slow commands (`grocery`, `plan-week`) ack immediately and post results when done — restart the bot after upgrades |
+| `recipe` returns wrong meal | Fixed: weekly plan meals are matched before the saved recipe library |
 | `invalid_auth` on Socket Mode | Regenerate `SLACK_APP_TOKEN` with `connections:write` |
 
 ## Security notes

@@ -5,7 +5,7 @@ import logging
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -365,6 +365,59 @@ class SQLiteStore:
                 (limit,),
             ).fetchall()
         return [WeeklyPlan.model_validate(json.loads(r["payload"])) for r in rows]
+
+    def recent_dishes_by_block(
+        self,
+        week_start: date,
+        *,
+        lookback_weeks: int = 2,
+        statuses: set[PlanStatus] | None = None,
+    ) -> dict[str, set[str]]:
+        """Meal titles from approved/active weeks in the lookback window before week_start."""
+        if lookback_weeks < 1:
+            return {}
+
+        active_statuses = statuses or {
+            PlanStatus.APPROVED,
+            PlanStatus.ACTIVE,
+            PlanStatus.COMPLETED,
+        }
+        cutoff_start = week_start - timedelta(weeks=lookback_weeks)
+        dishes: dict[str, set[str]] = {}
+
+        for plan in self.list_recent_plans(limit=30):
+            if plan.week_end >= week_start:
+                continue
+            if plan.week_start < cutoff_start:
+                continue
+            if plan.status not in active_statuses:
+                continue
+            for meal in plan.meals:
+                title = meal.recipe.title.strip()
+                if title:
+                    dishes.setdefault(meal.meal_block, set()).add(title)
+        return dishes
+
+    def list_recent_feedback(self, limit: int = 15) -> list[MealFeedback]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM meal_feedback ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [
+            MealFeedback(
+                id=r["id"],
+                meal_title=r["meal_title"],
+                meal_block=r["meal_block"] or "",
+                day=r["day"] or "",
+                rating=FeedbackRating(r["rating"]),
+                comment=r["comment"] or "",
+                member_id=r["member_id"],
+                created_at=datetime.fromisoformat(r["created_at"]),
+                applied_to_preferences=bool(r["applied"]),
+            )
+            for r in rows
+        ]
 
     def update_plan_status(self, plan_id: str, status: PlanStatus) -> None:
         plan = self.get_weekly_plan(plan_id)

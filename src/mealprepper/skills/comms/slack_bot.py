@@ -116,7 +116,18 @@ class SlackBotListener:
 
         payload_data = req.payload
         channel = payload_data.get("channel_id", "")
-        reply = self._dispatch(payload_data.get("text", "").strip(), payload_data.get("command", ""), channel)
+        command_name = payload_data.get("command", "")
+        command_text = payload_data.get("text", "").strip()
+        user = payload_data.get("user_id", "")
+        logger.info(
+            "Slash command: user=%s channel=%s cmd=%s text=%r",
+            user,
+            channel,
+            command_name,
+            command_text,
+        )
+        reply = self._dispatch(command_text, command_name, channel)
+        self._log_reply(reply, source="slash")
 
         if reply.defer:
             ack_payload = slack_message_payload(reply.text)
@@ -160,7 +171,10 @@ class SlackBotListener:
         if not text:
             return
 
+        user = event.get("user", "")
+        logger.info("Channel message: user=%s channel=%s text=%r", user, channel, text)
         reply = self.handler.handle(text, channel=channel)
+        self._log_reply(reply, source="message")
         if reply.defer:
             self._post_reply(channel, event.get("thread_ts") or event.get("ts"), reply)
             self._run_deferred(reply.defer, channel, event.get("thread_ts") or event.get("ts"))
@@ -188,9 +202,21 @@ class SlackBotListener:
             full_text = text or "help"
         return self.handler.handle(full_text, channel=channel)
 
+    @staticmethod
+    def _log_reply(reply: BotReply, *, source: str) -> None:
+        logger.info(
+            "Reply (%s): success=%s defer=%s text=%r",
+            source,
+            reply.success,
+            reply.defer,
+            reply.text[:240],
+        )
+
     def _run_deferred(self, action: str, channel: str, thread_ts: str | None) -> None:
+        logger.info("Deferred action started: %s channel=%s", action, channel)
         try:
             reply = self.handler.run_deferred(action)
+            self._log_reply(reply, source=f"deferred:{action}")
             self._post_reply(channel, thread_ts, reply)
         except Exception:
             logger.exception("Deferred Slack action failed: %s", action)

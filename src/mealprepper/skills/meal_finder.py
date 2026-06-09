@@ -14,6 +14,7 @@ from mealprepper.models.family import FamilyProfile
 from mealprepper.models.feedback import PreferenceProfile
 from mealprepper.models.meals import MealRecipe, PlannedMeal, RecipeStep
 from mealprepper.skills.blw_safety import BLWSafety
+from mealprepper.skills.dish_history import DishHistorySkill
 from mealprepper.skills.food_groups import FoodGroupsSkill
 from mealprepper.skills.meal_blocks import DAYS, WeekMealOutline
 from mealprepper.skills.meal_catalog import MealCatalog
@@ -68,6 +69,7 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
         self.max_meal_repeat = int(planning_cfg.get("max_meal_repeat_days", 2))
         self.recipe_top_k = int(index_cfg.get("recipe_top_k", 6))
         self.catalog = MealCatalog(self.settings)
+        self.dish_history = DishHistorySkill(store=self.store, settings=self.settings)
         self.recipe_repo = RecipeRepositorySkill(store=self.store, llm=self.llm, settings=self.settings)
         from mealprepper.skills.cook_efficiency import CookEfficiencyConfig
 
@@ -84,7 +86,10 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
         compact_prefs = self.store.get_compact_preferences() if self.store else preferences
         past_meals = self.meal_index.search("dinner lunch breakfast", top_k=self.meal_top_k)
         past_meals_text = self.meal_index.format_for_prompt(past_meals)
-        feedback_ctx = self.preference_index.relevant_for_block("adult_dinner", top_k=self.feedback_top_k)
+        feedback_ctx = self._build_feedback_context()
+        recent_excluded = self.dish_history.recent_titles_by_block(week_start)
+        excluded_normalized = self.dish_history.normalized_exclusions(recent_excluded)
+        exclusion_text = self.dish_history.format_exclusions(recent_excluded)
         plan_ctx = self.plan_index.similar_to_week(week_start, top_k=2)
         blw = BLWSafety(family, self.settings)
 
@@ -129,6 +134,8 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
             priority=15,
         )
         builder.add_section("Preferences", compact_prefs.to_prompt_context(), priority=20)
+        if exclusion_text:
+            builder.add_section("Recently served (avoid repeating)", exclusion_text, priority=22)
         if feedback_ctx:
             builder.add_section("Recent feedback", feedback_ctx, priority=25)
         builder.add_section("Block style guide", self.catalog.prompt_style_guide(), priority=35)
@@ -174,13 +181,25 @@ Cover every required block for each day.""",
             outlines = parse_outline_items(parsed, week_start)
             if len(outlines) < len(required_slots()) // 2:
                 raise ValueError(f"Too few valid outline items ({len(outlines)})")
-            outlines = finalize_outline(outlines, week_start, self.catalog, self.max_meal_repeat)
+            outlines = finalize_outline(
+                outlines,
+                week_start,
+                self.catalog,
+                self.max_meal_repeat,
+                excluded_by_block=excluded_normalized,
+            )
             logger.info("Week outline ready: %d meal slots", len(outlines))
             return outlines
         except (OllamaUnavailableError, ValueError) as exc:
             logger.warning("LLM meal finder failed, using catalog fallback: %s", exc)
             fallback = self.catalog.build_fallback_outline(week_start, self.max_meal_repeat)
-            return finalize_outline(fallback, week_start, self.catalog, self.max_meal_repeat)
+            return finalize_outline(
+                fallback,
+                week_start,
+                self.catalog,
+                self.max_meal_repeat,
+                excluded_by_block=excluded_normalized,
+            )
 
     def expand_recipe(self, outline: WeekMealOutline, family: FamilyProfile) -> MealRecipe:
         blw = BLWSafety(family, self.settings)
@@ -323,6 +342,29 @@ Cover every required block for each day.""",
             if not recipe.toddler_modifications:
                 recipe.toddler_modifications = "No spice; bite-sized pieces; check salt."
         return self.food_groups.annotate_recipe(recipe, outline.meal_block)
+
+    def _build_feedback_context(self) -> str:
+        """Aggregate indexed feedback, preference summary, and recent comments."""
+        lines: list[str] = []
+        for block in ("adult_dinner", "adult_lunch", "toddler_school_lunch"):
+            block_ctx = self.preference_index.relevant_for_block(block, top_k=self.feedback_top_k)
+            if block_ctx:
+                lines.append(block_ctx)
+
+        summary = self.store.get_latest_preference_summary()
+        if summary:
+            lines.append(f"Learned preferences: {summary}")
+
+        recent = self.store.list_recent_feedback(limit=8)
+        if recent:
+            comment_lines = []
+            for fb in recent:
+                comment = f" — {fb.comment}" if fb.comment and fb.comment != fb.meal_title else ""
+                block = f" ({fb.meal_block})" if fb.meal_block else ""
+                comment_lines.append(f"{fb.rating.value}: {fb.meal_title}{block}{comment}")
+            lines.append("Recent ratings:\n" + "\n".join(comment_lines[:8]))
+
+        return "\n".join(lines)
 
     def _family_context(self, family: FamilyProfile) -> str:
         lines = []

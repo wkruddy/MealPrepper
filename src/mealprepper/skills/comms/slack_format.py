@@ -133,7 +133,11 @@ def format_planned_meal_recipe(meal: PlannedMeal) -> str:
         lines.append("*Ingredients*")
         for ingredient in recipe.ingredients:
             qty = " ".join(part for part in [ingredient.quantity, ingredient.unit] if part).strip()
-            lines.append(f"• {ingredient.name}" + (f" — {qty}" if qty else ""))
+            name = ingredient.name.strip()
+            if name:
+                lines.append(f"• {name}" + (f" — {qty}" if qty else ""))
+            elif qty:
+                lines.append(f"• {qty}")
     if recipe.steps:
         lines.append("*Steps*")
         for step in sorted(recipe.steps, key=lambda item: item.order):

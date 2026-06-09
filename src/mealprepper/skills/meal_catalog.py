@@ -5,6 +5,7 @@ from datetime import date
 from typing import Any
 
 from mealprepper.config import Settings, get_settings
+from mealprepper.skills.dish_history import normalize_title
 from mealprepper.skills.meal_blocks import DAYS, WEEKDAY_SCHOOL_BLOCKS, WeekMealOutline
 
 
@@ -24,6 +25,7 @@ class MealCatalog:
         day_index: int,
         title_counts: Counter[str],
         max_repeat: int,
+        excluded_titles: set[str] | None = None,
     ) -> dict[str, Any]:
         options = self.options_for_block(block)
         if not options:
@@ -33,10 +35,18 @@ class MealCatalog:
                 "prep_minutes": 20,
             }
 
+        excluded = excluded_titles or set()
         rotated = options[day_index % len(options) :] + options[: day_index % len(options)]
         for option in rotated:
             title = str(option["title"])
+            if normalize_title(title) in excluded:
+                continue
             if title_counts[title] < max_repeat:
+                return option
+
+        for option in rotated:
+            title = str(option["title"])
+            if normalize_title(title) not in excluded:
                 return option
 
         least_used = min(options, key=lambda opt: title_counts[str(opt["title"])])
@@ -68,6 +78,7 @@ class MealCatalog:
         title_counts: Counter[str],
         max_repeat: int,
         day_index: int,
+        excluded_titles: set[str] | None = None,
     ) -> WeekMealOutline:
         if title_counts[outline.title] < max_repeat:
             return outline
@@ -76,6 +87,30 @@ class MealCatalog:
             day_index,
             title_counts,
             max_repeat=max_repeat - 1,
+            excluded_titles=excluded_titles,
+        )
+        return WeekMealOutline(
+            day=outline.day,
+            meal_block=outline.meal_block,
+            title=str(option["title"]),
+            key_ingredients=list(option.get("key_ingredients", [])),
+            prep_minutes=int(option.get("prep_minutes", outline.prep_minutes)),
+        )
+
+    def replace_excluded(
+        self,
+        outline: WeekMealOutline,
+        title_counts: Counter[str],
+        max_repeat: int,
+        day_index: int,
+        excluded_titles: set[str],
+    ) -> WeekMealOutline:
+        option = self.pick_for_slot(
+            outline.meal_block,
+            day_index,
+            title_counts,
+            max_repeat=max_repeat,
+            excluded_titles=excluded_titles,
         )
         return WeekMealOutline(
             day=outline.day,
@@ -90,14 +125,20 @@ class MealCatalog:
         block: str,
         used_titles: set[str],
         day_index: int,
+        excluded_titles: set[str] | None = None,
     ) -> dict[str, Any] | None:
         options = self.options_for_block(block)
         if not options:
             return None
+        excluded = excluded_titles or set()
         rotated = options[day_index % len(options) :] + options[: day_index % len(options)]
         for option in rotated:
-            if str(option["title"]) not in used_titles:
-                return option
+            title = str(option["title"])
+            if title in used_titles:
+                continue
+            if normalize_title(title) in excluded:
+                continue
+            return option
         return None
 
     def prompt_style_guide(self) -> str:

@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import date
 
 from mealprepper.models.feedback import FeedbackRating, MealFeedback
 from mealprepper.models.plans import WeeklyPlan
+
+
+@dataclass
+class FeedbackMealContext:
+    meal_title: str
+    meal_block: str = ""
+    day: str = ""
 
 
 class FeedbackCollectorSkill:
@@ -56,18 +64,37 @@ class FeedbackCollectorSkill:
             return False
         return None
 
-    def suggest_meal_for_feedback(self, plan: WeeklyPlan | None, target: date | None = None) -> str:
+    def suggest_meal_for_feedback(
+        self,
+        plan: WeeklyPlan | None,
+        target: date | None = None,
+    ) -> FeedbackMealContext:
         if not plan or not plan.meals:
-            return "last night's dinner"
+            return FeedbackMealContext(meal_title="last night's dinner", meal_block="adult_dinner")
         target = target or date.today()
         day_name = target.strftime("%A").lower()
         day_meals = plan.meals_for_day(day_name)
         dinners = [m for m in day_meals if m.meal_block == "adult_dinner"]
         if dinners:
-            return dinners[0].recipe.title
+            meal = dinners[0]
+            return FeedbackMealContext(
+                meal_title=meal.recipe.title,
+                meal_block=meal.meal_block,
+                day=meal.day,
+            )
         if day_meals:
-            return day_meals[-1].recipe.title
-        return plan.meals[-1].recipe.title
+            meal = day_meals[-1]
+            return FeedbackMealContext(
+                meal_title=meal.recipe.title,
+                meal_block=meal.meal_block,
+                day=meal.day,
+            )
+        meal = plan.meals[-1]
+        return FeedbackMealContext(
+            meal_title=meal.recipe.title,
+            meal_block=meal.meal_block,
+            day=meal.day,
+        )
 
     def _detect_rating(self, text: str) -> FeedbackRating | None:
         for rating, pattern in self.RATING_PATTERNS.items():

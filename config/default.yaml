@@ -26,6 +26,7 @@ planning:
   minimize_waste: true
   overlap_ingredients: true
   approval_required: true
+  dish_lookback_weeks: 2    # exclude dishes served in the previous N weeks
   max_meal_repeat_days: 3   # same meal title at most 3 times per block per week
   cook_efficiency:
     enabled: true
