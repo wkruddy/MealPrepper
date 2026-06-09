@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from mealprepper.skills.meal_blocks import DAYS
 
 if TYPE_CHECKING:
+    from mealprepper.models.grocery import GroceryItem, GroceryList
     from mealprepper.models.meals import PlannedMeal
     from mealprepper.models.plans import WeeklyPlan
 
 MAX_BLOCKS = 50
 MAX_SECTION_CHARS = 2900
+RECIPES_PER_MESSAGE = 35
+GROCERY_LINES_PER_SECTION = 28
 
 
 def markdown_to_slack_mrkdwn(text: str) -> str:
@@ -199,6 +203,93 @@ def build_week_recipes_messages(plan: WeeklyPlan, *, stale_note: str = "") -> li
                 builder.divider()
         messages.extend(builder.build_messages())
     return messages or [slack_message_payload("No meals found in this plan.")]
+
+
+def format_grocery_line(item: GroceryItem) -> str:
+    qty = (item.quantity or "").strip()
+    unit = (item.unit or "").strip()
+    if unit and unit not in qty:
+        qty = f"{qty} {unit}".strip()
+    if qty:
+        return f"• {item.name} — {qty}"
+    return f"• {item.name}"
+
+
+def build_grocery_messages(grocery: GroceryList) -> list[dict]:
+    """Full grocery list split across Slack messages (by section and category)."""
+    must_buy = grocery.must_buy or [item for item in grocery.items if item.section == "must_buy"]
+    weekly_staples = grocery.weekly_staples or [
+        item for item in grocery.items if item.section == "weekly_staple"
+    ]
+    shop_count = len(must_buy) + len(weekly_staples)
+
+    builder = SlackMessageBuilder()
+    builder.header(f"Grocery list — {grocery.week_label}")
+    builder.context(f"{shop_count} items to shop")
+    if grocery.synergy_notes:
+        builder.divider()
+        builder.section(grocery.synergy_notes)
+
+    def append_category_chunks(title: str, subtitle: str, items: list[GroceryItem]) -> None:
+        if not items:
+            return
+        by_cat: dict[str, list[GroceryItem]] = defaultdict(list)
+        for item in items:
+            category = item.category.value if hasattr(item.category, "value") else str(item.category)
+            by_cat[category].append(item)
+
+        builder.divider()
+        builder.section(f"*{title}*\n_{subtitle}_")
+        for category in sorted(by_cat):
+            lines = [format_grocery_line(item) for item in by_cat[category]]
+            for chunk_start in range(0, len(lines), GROCERY_LINES_PER_SECTION):
+                chunk = lines[chunk_start : chunk_start + GROCERY_LINES_PER_SECTION]
+                prefix = f"*{category.title()}*" if chunk_start == 0 else f"*{category.title()} (cont.)*"
+                builder.section(f"{prefix}\n" + "\n".join(chunk))
+
+    append_category_chunks(
+        "Shop for recipes",
+        "Unique or recipe-specific items to pick up",
+        must_buy,
+    )
+    append_category_chunks(
+        "Weekly staples",
+        "Buy if you're running low — used across multiple meals",
+        weekly_staples,
+    )
+
+    if grocery.pantry_assumed:
+        builder.divider()
+        pantry = ", ".join(grocery.pantry_assumed)
+        builder.section(f"*Already in pantry*\n_{pantry}_")
+
+    return builder.build_messages()
+
+
+def build_recipe_list_messages(
+    header: str,
+    lines: list[str],
+    *,
+    context: str = "",
+) -> list[dict]:
+    """Paginate a long recipe list across multiple Slack messages."""
+    if not lines:
+        return [slack_message_payload("No recipes found.")]
+
+    messages: list[dict] = []
+    for chunk_start in range(0, len(lines), RECIPES_PER_MESSAGE):
+        chunk = lines[chunk_start : chunk_start + RECIPES_PER_MESSAGE]
+        builder = SlackMessageBuilder()
+        if chunk_start == 0:
+            builder.header(header[:150])
+            if context:
+                builder.context(context)
+            builder.divider()
+        else:
+            builder.header(f"{header[:120]} (continued)")
+        builder.section("\n".join(chunk))
+        messages.extend(builder.build_messages())
+    return messages
 
 
 def build_daily_messages(day_name: str, plan_date: str, meal_lines: list[str], extras: list[str]) -> list[dict]:

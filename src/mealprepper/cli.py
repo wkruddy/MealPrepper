@@ -467,6 +467,26 @@ def sync_recipes(
     console.print(f"[green]Synced {len(imported)} source(s)[/green]")
 
 
+@app.command("remove-recipe")
+def remove_recipe(
+    title: str = typer.Argument(..., help="Recipe title or distinctive substring to delete."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show the match without deleting."),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Remove a single saved recipe from the family library."""
+    _setup_logging(verbose)
+    repo = RecipeRepositorySkill()
+    try:
+        removed = repo.remove_recipe(title, dry_run=dry_run)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    kind = "recipe" if removed.has_full_recipe() else "idea"
+    action = "Would remove" if dry_run else "Removed"
+    console.print(f"[green]{action}[/green] {removed.title} ({kind}, {removed.source_type})")
+
+
 @app.command("purge-recipes")
 def purge_recipes(
     duplicates: bool = typer.Option(
@@ -477,10 +497,13 @@ def purge_recipes(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be removed without deleting."),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
-    """Remove duplicate or unwanted saved recipes."""
+    """Remove duplicate saved recipes."""
     _setup_logging(verbose)
     if not duplicates:
-        console.print("[yellow]Specify --duplicates to remove duplicate recipes.[/yellow]")
+        console.print(
+            "[yellow]Specify --duplicates to remove duplicate recipes, "
+            "or use remove-recipe <title> for a single entry.[/yellow]"
+        )
         raise typer.Exit(1)
 
     repo = RecipeRepositorySkill()

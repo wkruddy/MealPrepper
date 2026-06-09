@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from datetime import date
 
-from mealprepper.models.plans import PlanStatus
+from mealprepper.models.plans import PlanStatus, WeeklyPlan
 from mealprepper.models.recipe_repository import SavedRecipe
 from mealprepper.orchestration.supervisor import MealPrepperSupervisor
 from mealprepper.skills.comms.slack_format import (
@@ -21,7 +21,7 @@ from mealprepper.skills.playbook_renderer import PlaybookRendererSkill
 from mealprepper.skills.pantry_config import _normalize_name
 from mealprepper.skills.recipe_repository import RecipeRepositorySkill
 
-MIN_SAVED_RECIPE_MATCH_SCORE = 200
+from mealprepper.skills.recipe_matching import MIN_RECIPE_MATCH_SCORE, recipe_match_score
 
 HELP_TEXT = """*MealPrepper commands*
 
@@ -46,6 +46,7 @@ HELP_TEXT = """*MealPrepper commands*
 • `recipes chicken` — search the library
 • `recipe salmon` — show steps for a saved or planned meal
 • `add-recipe Mild turkey tacos — kids love avocado` — save a meal idea
+• `remove-recipe Meatball Monday` — delete a saved recipe or idea
 
 *Feedback*
 • `loved chicken tacos` / `liked` / `disliked` / `neutral` / `reject`
@@ -75,6 +76,8 @@ KNOWN_COMMANDS = frozenset(
         "recipe",
         "add-recipe",
         "import-recipe",
+        "remove-recipe",
+        "delete-recipe",
     }
 )
 
@@ -92,24 +95,6 @@ class BotReply:
 
 def strip_bot_mention(text: str) -> str:
     return re.sub(r"<@[A-Z0-9]+>", "", text).strip()
-
-
-def recipe_match_score(query: str, title: str) -> int:
-    """Score how well a query matches a recipe title (higher is better)."""
-    normalized_query = _normalize_name(query)
-    normalized_title = _normalize_name(title)
-    if not normalized_query or not normalized_title:
-        return 0
-    if normalized_query == normalized_title:
-        return 1000
-    if normalized_query in normalized_title or normalized_title in normalized_query:
-        return 500 + len(normalized_query)
-    query_tokens = set(normalized_query.split())
-    title_tokens = set(normalized_title.split())
-    overlap = len(query_tokens & title_tokens)
-    if overlap == 0:
-        return 0
-    return overlap * 100
 
 
 def parse_command_text(text: str) -> tuple[str, str]:
@@ -193,6 +178,9 @@ class MealPrepperBotHandler:
 
         if command in {"add-recipe", "import-recipe"}:
             return self._handle_add_recipe(args)
+
+        if command in {"remove-recipe", "delete-recipe"}:
+            return self._handle_remove_recipe(args)
 
         message = f"{command} {args}".strip() if args else command
         if command not in KNOWN_COMMANDS:
@@ -471,71 +459,69 @@ class MealPrepperBotHandler:
         if not grocery:
             return BotReply("Grocery list was not created.", success=False)
 
-        items = grocery.must_buy or grocery.items
-        builder = SlackMessageBuilder()
-        builder.header(f"Grocery list — {grocery.week_label}")
-        builder.context(f"{len(items)} items")
-        builder.divider()
-        lines = []
-        for item in items[:20]:
-            qty = f" — {item.quantity}" if item.quantity else ""
-            lines.append(f"• {item.name}{qty}")
-        builder.section("\n".join(lines))
-        if len(items) > 20:
-            builder.context(f"…and {len(items) - 20} more. Run `mealprepper show-grocery` on the server.")
-        payload = builder.to_payload()
-        return BotReply(payload["text"], blocks=payload["blocks"])
+        from mealprepper.skills.comms.slack_format import build_grocery_messages
+
+        payloads = build_grocery_messages(grocery)
+        return BotReply(payloads[0]["text"], payloads=payloads)
 
     def _handle_recipes(self, query: str) -> BotReply:
-        limit = 20
-        builder = SlackMessageBuilder()
+        from mealprepper.skills.comms.slack_format import build_recipe_list_messages
+
         if query.strip():
-            matches = self.recipe_repo.search(query.strip(), top_k=limit)
+            matches = self.recipe_repo.search(query.strip(), top_k=0)
             if not matches:
                 return BotReply(f"No family recipes match *{query}*.", success=False)
-            builder.header(f"Recipes matching “{query}”")
             lines = []
             for match in matches:
                 saved = self.store.get_saved_recipe(match.recipe_id)
                 kind = "recipe" if saved and saved.has_full_recipe() else "idea"
                 lines.append(f"• {match.title} _({kind})_")
-            builder.section("\n".join(lines))
+            payloads = build_recipe_list_messages(
+                f"Recipes matching “{query.strip()}”",
+                lines,
+                context=f"{len(lines)} match{'es' if len(lines) != 1 else ''}",
+            )
         else:
-            saved = self.store.list_saved_recipes(limit=limit)
+            saved = self.store.list_saved_recipes(limit=0)
             if not saved:
                 return BotReply(
                     "No family recipes saved yet. Try `add-recipe <idea>` or run `sync-recipes` on the server.",
                     success=False,
                 )
-            builder.header("Family recipe library")
-            builder.context(f"{len(saved)} shown")
-            builder.divider()
-            lines = [f"• {item.title} _({'recipe' if item.has_full_recipe() else 'idea'})_" for item in saved]
-            builder.section("\n".join(lines))
-        payload = builder.to_payload()
-        return BotReply(payload["text"], blocks=payload["blocks"])
+            lines = [
+                f"• {item.title} _({'recipe' if item.has_full_recipe() else 'idea'})_"
+                for item in saved
+            ]
+            payloads = build_recipe_list_messages(
+                "Family recipe library",
+                lines,
+                context=f"{len(saved)} saved",
+            )
+        return BotReply(payloads[0]["text"], payloads=payloads)
 
     def _handle_recipe(self, query: str) -> BotReply:
         if not query.strip():
             return BotReply("Usage: `recipe <name>` — e.g. `recipe smash burger`", success=False)
 
-        plan = self.store.get_plan_for_date(date.today()) or self._resolve_plan_for_view()
-        if plan:
-            meal = self._find_planned_meal(plan, query)
-            if meal:
-                builder = SlackMessageBuilder()
-                builder.header(f"{meal.day.title()} · {meal.recipe.title}")
-                builder.context("_From this week's meal plan_")
-                builder.divider()
-                builder.section(format_planned_meal_recipe(meal))
-                payload = builder.to_payload()
-                return BotReply(payload["text"], blocks=payload["blocks"])
+        match = self._find_best_recipe_match(query.strip())
+        if not match:
+            return BotReply(f"No saved or planned recipe matches *{query}*.", success=False)
 
-        saved = self._find_saved_recipe(query)
-        if saved:
-            return self._recipe_reply_from_saved(saved)
+        kind, payload_obj, plan = match
+        if kind == "planned":
+            meal = self._resolve_planned_meal_recipe(payload_obj, plan)
+            builder = SlackMessageBuilder()
+            builder.header(f"{meal.day.title()} · {meal.recipe.title}")
+            context = "_From this week's meal plan_"
+            if meal.cook_note:
+                context = f"{context} · {meal.cook_note}"
+            builder.context(context)
+            builder.divider()
+            builder.section(format_planned_meal_recipe(meal))
+            payload = builder.to_payload()
+            return BotReply(payload["text"], blocks=payload["blocks"])
 
-        return BotReply(f"No saved or planned recipe matches *{query}*.", success=False)
+        return self._recipe_reply_from_saved(payload_obj)
 
     def _handle_add_recipe(self, text: str) -> BotReply:
         if not text.strip():
@@ -549,6 +535,20 @@ class MealPrepperBotHandler:
         builder = SlackMessageBuilder()
         builder.header("Recipe saved")
         builder.section(f"*{saved.title}* saved as a {kind} in the family library.")
+        payload = builder.to_payload()
+        return BotReply(payload["text"], blocks=payload["blocks"])
+
+    def _handle_remove_recipe(self, query: str) -> BotReply:
+        if not query.strip():
+            return BotReply("Usage: `remove-recipe <title>` — e.g. `remove-recipe Meatball Monday`", success=False)
+        try:
+            removed = self.recipe_repo.remove_recipe(query.strip())
+        except ValueError as exc:
+            return BotReply(str(exc), success=False)
+        kind = "recipe" if removed.has_full_recipe() else "idea"
+        builder = SlackMessageBuilder()
+        builder.header("Recipe removed")
+        builder.section(f"Removed *{removed.title}* ({kind}) from the family library.")
         payload = builder.to_payload()
         return BotReply(payload["text"], blocks=payload["blocks"])
 
@@ -586,27 +586,57 @@ class MealPrepperBotHandler:
         payload = builder.to_payload()
         return BotReply(payload["text"], blocks=payload["blocks"])
 
-    def _find_saved_recipe(self, query: str) -> SavedRecipe | None:
-        results = self.recipe_repo.search(query, top_k=8)
-        best_id = ""
-        best_score = 0
-        for result in results:
-            score = recipe_match_score(query, result.title)
-            if score > best_score:
-                best_score = score
-                best_id = result.recipe_id
-        if best_score < MIN_SAVED_RECIPE_MATCH_SCORE:
-            return None
-        return self.store.get_saved_recipe(best_id)
+    def _find_best_recipe_match(
+        self,
+        query: str,
+    ) -> tuple[str, object, WeeklyPlan | None] | None:
+        """Return (kind, meal_or_saved, plan) for the strongest query match."""
+        candidates: list[tuple[int, str, object, WeeklyPlan | None]] = []
 
-    def _find_planned_meal(self, plan, query: str):
-        best_meal = None
-        best_score = 0
-        for meal in plan.meals:
-            score = recipe_match_score(query, meal.recipe.title)
-            if score > best_score:
-                best_score = score
-                best_meal = meal
-        if best_score < 100:
+        plan = self.store.get_plan_for_date(date.today()) or self._resolve_plan_for_view()
+        if plan:
+            for meal in plan.meals:
+                score = recipe_match_score(query, meal.recipe.title)
+                if score >= MIN_RECIPE_MATCH_SCORE:
+                    candidates.append((score, "planned", meal, plan))
+
+        for result in self.recipe_repo.search(query, top_k=8):
+            score = recipe_match_score(query, result.title)
+            if score >= MIN_RECIPE_MATCH_SCORE:
+                saved = self.store.get_saved_recipe(result.recipe_id)
+                if saved:
+                    candidates.append((score, "saved", saved, None))
+
+        if not candidates:
             return None
-        return best_meal
+
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        score, kind, payload, plan_ref = candidates[0]
+        return kind, payload, plan_ref
+
+    def _resolve_planned_meal_recipe(self, meal, plan):
+        """Align planned meal recipe body with its title when possible."""
+        normalized_title = _normalize_name(meal.recipe.title)
+        saved_matches = self.recipe_repo.find_recipes_by_query(meal.recipe.title)
+        for saved in saved_matches:
+            if saved.has_full_recipe() and _normalize_name(saved.title) == normalized_title:
+                resolved = meal.model_copy(deep=True)
+                resolved.recipe = saved.to_meal_recipe(meal.recipe.title)
+                return resolved
+
+        if meal.cook_source_day and meal.cook_source_block and plan:
+            source = next(
+                (
+                    candidate
+                    for candidate in plan.meals
+                    if candidate.day == meal.cook_source_day
+                    and candidate.meal_block == meal.cook_source_block
+                ),
+                None,
+            )
+            if source and _normalize_name(source.recipe.title) == normalized_title:
+                resolved = meal.model_copy(deep=True)
+                resolved.recipe = source.recipe.model_copy(deep=True)
+                return resolved
+
+        return meal

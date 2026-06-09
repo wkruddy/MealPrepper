@@ -107,6 +107,17 @@ def test_dedupe_by_content_hash():
         assert first.id == second.id
 
 
+def test_remove_recipe_by_title():
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = Path(tmp) / "test.db"
+        store = SQLiteStore(db_path=db_path)
+        repo = RecipeRepositorySkill(store=store)
+        saved = repo.import_text("Meatball night with grandpa", title="Meatball Monday with Papa K", source_label="note")
+        removed = repo.remove_recipe("Meatball Monday with Papa K")
+        assert removed.id == saved.id
+        assert store.list_saved_recipes(limit=0) == []
+
+
 def test_purge_duplicates_keeps_richest_copy():
     with tempfile.TemporaryDirectory() as tmp:
         db_path = Path(tmp) / "test.db"

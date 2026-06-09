@@ -34,6 +34,10 @@ planning:
     max_dinner_cook_sessions: 4   # target ~4 unique dinner cooks per week
     cross_block_reuse: true       # Monday dinner -> Tuesday lunch leftovers
     repeat_dinners: true          # reuse dinners across non-consecutive days
+  ingredient_cohesion:
+    enabled: true
+    anchor_top_n: 10              # shared ingredients to prioritize across the week
+    min_mentions: 2               # ingredient must appear in 2+ meals to become an anchor
 
 storage:
   database: mealprepper.db

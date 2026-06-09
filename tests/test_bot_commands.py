@@ -7,9 +7,9 @@ from mealprepper.models.recipe_repository import SavedRecipe
 from mealprepper.skills.comms.bot_commands import (
     MealPrepperBotHandler,
     parse_command_text,
-    recipe_match_score,
     strip_bot_mention,
 )
+from mealprepper.skills.recipe_matching import recipe_match_score
 
 
 def test_strip_bot_mention():
@@ -228,6 +228,78 @@ def test_grocery_defers_slow_generation():
     reply = handler.handle("grocery")
     assert reply.defer == "grocery"
     supervisor.generate_grocery.assert_not_called()
+
+
+def test_recipe_prefers_saved_library_over_weak_plan_match():
+    supervisor = MagicMock()
+    plan = WeeklyPlan(
+        week_start=date(2026, 6, 9),
+        week_end=date(2026, 6, 15),
+        status=PlanStatus.APPROVED,
+        meals=[
+            PlannedMeal(
+                day="monday",
+                meal_block="adult_dinner",
+                recipe=MealRecipe(
+                    title="Sheet Pan Lemon Herb Chicken",
+                    steps=[RecipeStep(order=1, instruction="Bake chicken")],
+                ),
+            )
+        ],
+    )
+    supervisor.store.get_plan_for_date.return_value = plan
+    saved = SavedRecipe(
+        id="salad",
+        title="Chicken Salad",
+        recipe=MealRecipe(
+            title="Chicken Salad",
+            steps=[RecipeStep(order=1, instruction="Toss chicken with dressing")],
+        ),
+    )
+    supervisor.store.get_saved_recipe.return_value = saved
+    recipe_repo = MagicMock()
+    recipe_repo.search.return_value = [MagicMock(recipe_id="salad", title="Chicken Salad")]
+    handler = MealPrepperBotHandler(supervisor=supervisor, recipe_repo=recipe_repo)
+    reply = handler.handle("recipe chicken salad")
+    assert reply.success
+    assert "Toss chicken with dressing" in str(reply.blocks)
+    assert "Bake chicken" not in str(reply.blocks)
+
+
+def test_recipe_resolves_planned_title_from_saved_library():
+    supervisor = MagicMock()
+    plan = WeeklyPlan(
+        week_start=date(2026, 6, 9),
+        week_end=date(2026, 6, 15),
+        status=PlanStatus.APPROVED,
+        meals=[
+            PlannedMeal(
+                day="monday",
+                meal_block="adult_dinner",
+                recipe=MealRecipe(
+                    title="Sheet Pan Lemon Herb Chicken",
+                    steps=[RecipeStep(order=1, instruction="Bake quesadillas")],
+                ),
+            )
+        ],
+    )
+    supervisor.store.get_plan_for_date.return_value = plan
+    saved = SavedRecipe(
+        id="chicken",
+        title="Sheet Pan Lemon Herb Chicken",
+        recipe=MealRecipe(
+            title="Sheet Pan Lemon Herb Chicken",
+            steps=[RecipeStep(order=1, instruction="Roast lemon chicken")],
+        ),
+    )
+    recipe_repo = MagicMock()
+    recipe_repo.search.return_value = []
+    recipe_repo.find_recipes_by_query.return_value = [saved]
+    handler = MealPrepperBotHandler(supervisor=supervisor, recipe_repo=recipe_repo)
+    reply = handler.handle("recipe sheet pan lemon herb chicken")
+    assert reply.success
+    assert "Roast lemon chicken" in str(reply.blocks)
+    assert "Bake quesadillas" not in str(reply.blocks)
 
 
 def test_recipe_shows_saved_steps():

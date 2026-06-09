@@ -102,7 +102,7 @@ class RecipeIndex:
         if meal_block:
             block_filter = " AND (r.meal_blocks LIKE ? OR r.meal_blocks = '')"
             params.append(f"%{meal_block}%")
-        params.append(top_k)
+        params.append(top_k if top_k > 0 else -1)
 
         sql = f"""
             SELECT r.id, r.title, r.meal_blocks, r.tags, r.source_type, r.source_label, r.notes,
@@ -134,7 +134,7 @@ class RecipeIndex:
             sql += " AND (meal_blocks LIKE ? OR meal_blocks = '')"
             params.append(f"%{meal_block}%")
         sql += " ORDER BY updated_at DESC LIMIT ?"
-        params.append(top_k)
+        params.append(top_k if top_k > 0 else -1)
         with self._connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [self._row_to_recipe(row) for row in rows]
@@ -185,7 +185,7 @@ class RecipeIndex:
             sql += " AND (meal_blocks LIKE ? OR meal_blocks = '')"
             params.append(f"%{meal_block}%")
         sql += " ORDER BY updated_at DESC LIMIT ?"
-        params.append(top_k)
+        params.append(top_k if top_k > 0 else -1)
         with self._connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [self._row_to_recipe(row) for row in rows]

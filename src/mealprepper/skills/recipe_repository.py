@@ -20,6 +20,7 @@ from mealprepper.models.meals import Ingredient, MealRecipe, RecipeStep
 from mealprepper.models.recipe_repository import SavedRecipe
 from mealprepper.skills.meal_blocks import WeekMealOutline
 from mealprepper.skills.pantry_config import _normalize_name
+from mealprepper.skills.recipe_matching import MIN_RECIPE_MATCH_SCORE, recipe_match_score
 from mealprepper.storage.sqlite import SQLiteStore
 
 logger = logging.getLogger(__name__)
@@ -299,6 +300,51 @@ family_notes, key_ingredients, and suggested meal_blocks — leave ingredients/s
                 logger.warning("Failed to sync recipe source %s: %s", source, exc)
         return imported
 
+    def find_recipes_by_query(self, query: str) -> list[SavedRecipe]:
+        """Find saved recipes whose title matches a query (normalized substring)."""
+        normalized_query = _normalize_recipe_title(query)
+        if not normalized_query:
+            return []
+
+        matches: list[SavedRecipe] = []
+        query_tokens = set(normalized_query.split())
+        for recipe in self.store.list_saved_recipes(limit=0):
+            normalized_title = _normalize_recipe_title(recipe.title)
+            if normalized_query == normalized_title:
+                matches.insert(0, recipe)
+                continue
+            if normalized_query in normalized_title or normalized_title in normalized_query:
+                matches.append(recipe)
+                continue
+            if query_tokens & set(normalized_title.split()):
+                matches.append(recipe)
+        return matches
+
+    def remove_recipe(self, query: str, *, dry_run: bool = False) -> SavedRecipe:
+        """Delete a saved recipe by title query. Raises ValueError if none or ambiguous."""
+        matches = self.find_recipes_by_query(query)
+        if not matches:
+            raise ValueError(f"No saved recipe matches “{query}”.")
+
+        normalized_query = _normalize_recipe_title(query)
+        exact = [recipe for recipe in matches if _normalize_recipe_title(recipe.title) == normalized_query]
+        if len(exact) == 1:
+            target = exact[0]
+        elif len(matches) == 1:
+            target = matches[0]
+        else:
+            titles = ", ".join(recipe.title for recipe in matches[:5])
+            raise ValueError(
+                f"“{query}” matches {len(matches)} recipes ({titles}). Use a more specific title."
+            )
+
+        if not dry_run:
+            deleted = self.store.delete_saved_recipe(target.id or "")
+            if not deleted:
+                raise ValueError(f"Failed to delete recipe “{target.title}”.")
+            logger.info("Removed saved recipe: %s (%s)", target.title, target.id)
+        return target
+
     def purge_duplicates(self, *, dry_run: bool = False) -> list[tuple[SavedRecipe, SavedRecipe]]:
         """Remove duplicate recipes, keeping the richest copy in each title group."""
         recipes = self.store.list_saved_recipes(limit=0)
@@ -327,7 +373,8 @@ family_notes, key_ingredients, and suggested meal_blocks — leave ingredients/s
         meal_block: str | None = None,
         top_k: int | None = None,
     ):
-        return self.index.search(query, meal_block=meal_block, top_k=top_k or self.recipe_top_k)
+        resolved = self.recipe_top_k if top_k is None else top_k
+        return self.index.search(query, meal_block=meal_block, top_k=resolved)
 
     def search_for_planning(self, query: str = "family favorites dinner lunch") -> list:
         return self.search(query, top_k=self.recipe_top_k)
@@ -355,12 +402,16 @@ family_notes, key_ingredients, and suggested meal_blocks — leave ingredients/s
                     continue
                 return candidate
         results = self.search(outline.title, meal_block=outline.meal_block, top_k=3)
-        if not results:
+        best_id = ""
+        best_score = 0
+        for result in results:
+            score = recipe_match_score(outline.title, result.title)
+            if score > best_score:
+                best_score = score
+                best_id = result.recipe_id
+        if best_score < MIN_RECIPE_MATCH_SCORE or not best_id:
             return None
-        top = results[0]
-        if _normalize_name(top.title) != target and top.score == 0:
-            return None
-        return self.store.get_saved_recipe(top.recipe_id)
+        return self.store.get_saved_recipe(best_id)
 
     def _parse_content(
         self,

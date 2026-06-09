@@ -2,10 +2,14 @@ from datetime import date
 
 from mealprepper.models.meals import Ingredient, MealRecipe, PlannedMeal, RecipeStep
 from mealprepper.models.plans import PlanStatus, WeeklyPlan
+from mealprepper.models.grocery import GroceryCategory, GroceryItem, GroceryList
 from mealprepper.skills.comms.slack_format import (
     SlackMessageBuilder,
+    build_grocery_messages,
+    build_recipe_list_messages,
     build_week_recipes_messages,
     build_week_titles_messages,
+    format_grocery_line,
     markdown_to_slack_mrkdwn,
     slack_message_payload,
 )
@@ -67,6 +71,41 @@ def test_build_week_recipes_messages_include_steps():
     body = str(payloads[0]["blocks"])
     assert "Warm tortillas" in body
     assert "Ingredients" in body
+
+
+def test_format_grocery_line_includes_quantity():
+    line = format_grocery_line(
+        GroceryItem(name="Chicken thighs", quantity="2", unit="lb", category=GroceryCategory.MEAT)
+    )
+    assert "Chicken thighs" in line
+    assert "2 lb" in line
+
+
+def test_build_grocery_messages_includes_all_sections():
+    grocery = GroceryList(
+        week_label="2026-06-01 — 2026-06-07",
+        must_buy=[
+            GroceryItem(name="Salmon", quantity="1", unit="lb", category=GroceryCategory.MEAT),
+        ],
+        weekly_staples=[
+            GroceryItem(name="Milk", quantity="1", unit="gallon", category=GroceryCategory.DAIRY),
+        ],
+        pantry_assumed=["salt"],
+        synergy_notes="Cook extra rice Tuesday for Wednesday.",
+    )
+    payloads = build_grocery_messages(grocery)
+    body = str(payloads)
+    assert "Salmon" in body
+    assert "Milk" in body
+    assert "Already in pantry" in body
+    assert "Cook extra rice" in body
+    assert "…and" not in body
+
+
+def test_build_recipe_list_messages_paginates():
+    lines = [f"• Recipe {index}" for index in range(50)]
+    payloads = build_recipe_list_messages("Library", lines, context="50 saved")
+    assert len(payloads) >= 2
 
 
 def test_slack_message_payload_uses_blocks():

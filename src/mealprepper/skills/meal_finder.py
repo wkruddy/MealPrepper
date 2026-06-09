@@ -19,6 +19,12 @@ from mealprepper.skills.food_groups import FoodGroupsSkill
 from mealprepper.skills.meal_blocks import DAYS, WeekMealOutline
 from mealprepper.skills.meal_catalog import MealCatalog
 from mealprepper.skills.recipe_repository import RecipeRepositorySkill
+from mealprepper.skills.pantry_config import _normalize_name
+from mealprepper.skills.ingredient_cohesion import (
+    align_bulk_prep_to_anchors,
+    cohesion_prompt_lines,
+    compute_anchor_ingredients,
+)
 from mealprepper.skills.week_outline import finalize_outline, parse_outline_items, required_slots
 from mealprepper.storage.sqlite import SQLiteStore
 
@@ -41,8 +47,11 @@ class MealFinderSkill:
     SYSTEM = """You are the MealPrepper meal finder for a family with a toddler (no spicy, quick dinners),
 two adults, and an infant doing baby-led weaning. Users are competent cooks.
 
-Return practical, real meals — not generic placeholders. Reuse ingredients across the week when sensible,
-but do NOT repeat the same meal title more than twice per meal block in one week.
+Return practical, real meals — not generic placeholders. Prioritize easy weeks: fewer unique
+ingredients per day, shared components across nights (cook extra rice Tuesday for Wednesday's bowl),
+and Saturday bulk prep that feeds weekday dinners.
+Reuse ingredients across the week when sensible, but do NOT repeat the same meal title more than
+twice per meal block in one week.
 Adult dinners must be ready within 45 minutes total prep+cook."""
 
     def __init__(
@@ -75,6 +84,11 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
 
         self.cook_efficiency = CookEfficiencyConfig.from_settings(self.settings)
         self.food_groups = FoodGroupsSkill(self.settings)
+        cohesion_cfg = planning_cfg.get("ingredient_cohesion", {})
+        self.cohesion_enabled = bool(cohesion_cfg.get("enabled", True))
+        self.cohesion_top_n = int(cohesion_cfg.get("anchor_top_n", 10))
+        self.cohesion_min_mentions = int(cohesion_cfg.get("min_mentions", 2))
+        self._week_anchors: list[str] = []
 
     def find_week_outline(
         self,
@@ -111,6 +125,8 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
                 "- Seafood leftovers keep ~2 days; poultry ~3; most veg/grain dishes ~4-5.\n"
                 "- Do not plan leftover seafood more than 1 day after cooking.\n"
                 "- Saturday bulk_meal_prep should prep components reused in weekday meals.\n"
+                "- When a dinner uses rice/grains/roasted veg, plan the next night to reuse leftovers.\n"
+                "- Pick dinners that share proteins and produce — not 7 unrelated cuisines.\n"
                 f"- Same title may repeat up to {self.max_meal_repeat} times per block.",
                 priority=13,
             )
@@ -188,18 +204,32 @@ Cover every required block for each day.""",
                 self.max_meal_repeat,
                 excluded_by_block=excluded_normalized,
             )
+            outlines = self._apply_ingredient_cohesion(outlines)
             logger.info("Week outline ready: %d meal slots", len(outlines))
             return outlines
         except (OllamaUnavailableError, ValueError) as exc:
             logger.warning("LLM meal finder failed, using catalog fallback: %s", exc)
             fallback = self.catalog.build_fallback_outline(week_start, self.max_meal_repeat)
-            return finalize_outline(
+            fallback = finalize_outline(
                 fallback,
                 week_start,
                 self.catalog,
                 self.max_meal_repeat,
                 excluded_by_block=excluded_normalized,
             )
+            return self._apply_ingredient_cohesion(fallback)
+
+    def _apply_ingredient_cohesion(self, outlines: list[WeekMealOutline]) -> list[WeekMealOutline]:
+        if not self.cohesion_enabled:
+            self._week_anchors = []
+            return outlines
+        anchors = compute_anchor_ingredients(
+            outlines,
+            top_n=self.cohesion_top_n,
+            min_mentions=self.cohesion_min_mentions,
+        )
+        self._week_anchors = anchors
+        return align_bulk_prep_to_anchors(outlines, anchors)
 
     def expand_recipe(self, outline: WeekMealOutline, family: FamilyProfile) -> MealRecipe:
         blw = BLWSafety(family, self.settings)
@@ -234,9 +264,13 @@ Cover every required block for each day.""",
             "Fields",
             "title, description, prep_minutes, cook_minutes, servings, ingredients (name, quantity, unit, category), "
             "steps (order, instruction, duration_minutes), tags, food_groups (carb/protein/veggie/fruit/fat → ingredient), "
-            "infant_guidance, toddler_modifications.",
+            "infant_guidance, toddler_modifications.\n"
+            "Ingredient names must be food only — put amounts in quantity and units in unit (never '2 cups rice' in name).",
             priority=10,
         )
+        cohesion = cohesion_prompt_lines(self._week_anchors)
+        if cohesion:
+            builder.add_section("Week cohesion", cohesion, priority=8)
         if self.food_groups.strict_for_block(outline.meal_block):
             builder.add_section(
                 "Food groups",
@@ -272,6 +306,12 @@ Cover every required block for each day.""",
         outlines: list[WeekMealOutline],
         family: FamilyProfile,
     ) -> list[PlannedMeal]:
+        if self.cohesion_enabled:
+            self._week_anchors = compute_anchor_ingredients(
+                outlines,
+                top_n=self.cohesion_top_n,
+                min_mentions=self.cohesion_min_mentions,
+            )
         meals: list[PlannedMeal] = []
         recipe_cache: dict[tuple[str, str], MealRecipe] = {}
         total = len(outlines)
@@ -282,18 +322,40 @@ Cover every required block for each day.""",
                 else None
             )
             if source_key and source_key in recipe_cache:
-                recipe = recipe_cache[source_key].model_copy(deep=True)
-                recipe.title = outline.title
-                logger.info(
-                    "Reusing recipe %d/%d: %s (%s, %s) from %s %s",
-                    index,
-                    total,
-                    outline.title,
-                    outline.day,
-                    outline.meal_block,
-                    outline.reuse_of_day,
-                    outline.reuse_of_block,
-                )
+                cached = recipe_cache[source_key]
+                if _normalize_name(cached.title) != _normalize_name(outline.title):
+                    saved = self.recipe_repo.match_outline(outline)
+                    if saved and saved.has_full_recipe():
+                        recipe = saved.to_meal_recipe(outline.title)
+                        logger.info(
+                            "Resolved reused slot %d/%d: %s via saved recipe %s",
+                            index,
+                            total,
+                            outline.title,
+                            saved.title,
+                        )
+                    else:
+                        recipe = self.expand_recipe(outline, family)
+                        logger.info(
+                            "Re-expanded reused slot %d/%d: %s (title differs from %s)",
+                            index,
+                            total,
+                            outline.title,
+                            cached.title,
+                        )
+                else:
+                    recipe = cached.model_copy(deep=True)
+                    recipe.title = outline.title
+                    logger.info(
+                        "Reusing recipe %d/%d: %s (%s, %s) from %s %s",
+                        index,
+                        total,
+                        outline.title,
+                        outline.day,
+                        outline.meal_block,
+                        outline.reuse_of_day,
+                        outline.reuse_of_block,
+                    )
             else:
                 logger.info(
                     "Expanding recipe %d/%d: %s (%s, %s)",
@@ -326,6 +388,7 @@ Cover every required block for each day.""",
         outline: WeekMealOutline,
         blw: BLWSafety,
     ) -> MealRecipe:
+        recipe = self._sanitize_recipe_ingredients(recipe)
         ingredient_names = [i.name for i in recipe.ingredients] or outline.key_ingredients
         if outline.meal_block == "infant_blw":
             warnings, blocked, guidance = blw.validate_meal(recipe.title, ingredient_names)
@@ -389,6 +452,14 @@ Cover every required block for each day.""",
         if block.startswith("adult") or block == "bulk_meal_prep":
             return [adult.id for adult in family.adults()]
         return family.member_ids()
+
+    def _sanitize_recipe_ingredients(self, recipe: MealRecipe) -> MealRecipe:
+        from mealprepper.skills.grocery_normalizer import repair_ingredient
+
+        repaired = [fixed for ing in recipe.ingredients if (fixed := repair_ingredient(ing))]
+        if repaired:
+            recipe.ingredients = repaired
+        return recipe
 
     def _fallback_recipe(self, outline: WeekMealOutline, blw: BLWSafety) -> MealRecipe:
         from mealprepper.models.meals import Ingredient

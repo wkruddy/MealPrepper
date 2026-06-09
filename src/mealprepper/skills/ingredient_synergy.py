@@ -85,8 +85,10 @@ class SynergyReport(BaseModel):
 class IngredientSynergySkill:
     """Analyze and optimize ingredient overlap across the week's meals."""
 
-    SYSTEM = """You minimize food waste by maximizing ingredient overlap across a family's weekly meals.
-Identify shared produce/proteins, flag items used only once, and suggest swaps to reuse leftovers."""
+    SYSTEM = """You minimize food waste and daily kitchen complexity by maximizing ingredient overlap.
+Identify shared produce/proteins, flag single-use items, and suggest concrete reuse:
+cook extra rice/grains for the next night, batch roast vegetables on Saturday for weekday dinners,
+turn Monday dinner into Tuesday lunch, and align toddler lunches with dinner staples when possible."""
 
     def __init__(self, llm: OllamaClient | None = None) -> None:
         settings = get_settings()
@@ -139,16 +141,22 @@ Identify shared produce/proteins, flag items used only once, and suggest swaps t
             )
 
     def consolidate_ingredients(self, meals: list[PlannedMeal]) -> list[Ingredient]:
+        from mealprepper.skills.grocery_normalizer import repair_ingredient
+
         merged: dict[str, Ingredient] = {}
         for meal in meals:
-            for ing in meal.recipe.ingredients:
+            for raw in meal.recipe.ingredients:
+                ing = repair_ingredient(raw)
+                if ing is None:
+                    continue
                 key = ing.name.lower().strip()
                 if key not in merged:
                     merged[key] = ing.model_copy()
                 else:
                     existing = merged[key]
-                    if ing.quantity:
-                        existing.quantity = f"{existing.quantity}, {ing.quantity}".strip(", ")
+                    qty = " ".join(part for part in [ing.quantity, ing.unit] if part).strip()
+                    if qty:
+                        existing.quantity = f"{existing.quantity}, {qty}".strip(", ")
         return list(merged.values())
 
     def _meal_summary(self, meals: list[PlannedMeal]) -> str:

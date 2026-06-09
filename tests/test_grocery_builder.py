@@ -4,7 +4,12 @@ from mealprepper.models.grocery import GroceryCategory
 from mealprepper.models.meals import Ingredient, MealRecipe, PlannedMeal
 from mealprepper.models.plans import WeeklyPlan
 from mealprepper.skills.grocery_builder import GroceryBuilderSkill
-from mealprepper.skills.grocery_normalizer import GroceryNormalizer, canonicalize_name, normalize_grocery_category
+from mealprepper.skills.grocery_normalizer import (
+    GroceryNormalizer,
+    canonicalize_name,
+    normalize_grocery_category,
+    repair_ingredient,
+)
 from mealprepper.skills.pantry_config import PantryConfig
 
 
@@ -87,6 +92,27 @@ def test_normalizer_uses_shoppable_quantities():
     )
     eggs = next(i for i in grocery.weekly_staples if "egg" in i.name.lower())
     assert "dozen" in eggs.quantity.lower()
+
+
+def test_repair_ingredient_splits_quantity_from_name():
+    fixed = repair_ingredient(Ingredient(name="1 1/2 C Shredded Mozzarella", quantity="1"))
+    assert fixed is not None
+    assert "mozzarella" in fixed.name.lower()
+    assert fixed.quantity
+    assert repair_ingredient(Ingredient(name="3", quantity="1")) is None
+    assert repair_ingredient(Ingredient(name="—", quantity="1")) is None
+
+
+def test_repair_ingredient_does_not_strip_leading_letters():
+    for name in (
+        "Can 20 Ounces Pineapple Chunks Drained",
+        "Garlic Minced",
+        "Carrot Sticks",
+        "Cream Of Chicken Soup",
+    ):
+        fixed = repair_ingredient(Ingredient(name=name, quantity="1"))
+        assert fixed is not None
+        assert fixed.name == name, f"mutated name {name!r} -> {fixed.name!r}"
 
 
 def test_pantry_config_matches_spices():

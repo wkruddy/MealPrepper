@@ -11,6 +11,58 @@ from mealprepper.skills.pantry_config import PantryConfig, _normalize_name
 
 logger = logging.getLogger(__name__)
 
+_MEASUREMENT_UNITS = (
+    r"cups?|tablespoons?|tbsp|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|lb|"
+    r"grams?|milliliters?|ml|liters?|l|cans?|envelopes?"
+)
+# Abbreviation "c" for cup only after a number (never bare — avoids stripping "Carrot", "Can", etc.)
+_NUMERIC_QTY_RE = re.compile(
+    rf"^((?:\d+(?:\.\d+)?\s+)*(?:\d+/\d+)?\s*)"
+    rf"(?:(?:{_MEASUREMENT_UNITS})|c(?=\s))?\s+"
+    rf"(.+)$",
+    re.IGNORECASE,
+)
+def repair_ingredient(ingredient: Ingredient) -> Ingredient | None:
+    """Fix LLM ingredients where quantity leaked into the name field."""
+    name = (ingredient.name or "").strip()
+    quantity = (ingredient.quantity or "").strip()
+    unit = (ingredient.unit or "").strip()
+
+    if not name:
+        return None
+    if re.fullmatch(r"[\d./\s\-–]+", name):
+        return None
+
+    if re.match(r"^\d", name):
+        match = _NUMERIC_QTY_RE.match(name)
+        if match:
+            extra_qty = match.group(1).strip()
+            remainder = match.group(2).strip()
+            extra_unit = ""
+            unit_match = re.match(
+                rf"^(({_MEASUREMENT_UNITS})|c)\s+(.+)$",
+                remainder,
+                re.IGNORECASE,
+            )
+            if unit_match:
+                extra_unit = unit_match.group(1).strip()
+                remainder = unit_match.group(3).strip()
+            if remainder and len(remainder) > 2:
+                quantity = " ".join(part for part in [quantity, extra_qty] if part).strip() or extra_qty
+                unit = unit or extra_unit
+                name = remainder
+
+    if len(name) < 2 or re.fullmatch(r"[\d./\s\-–]+", name):
+        return None
+
+    return Ingredient(
+        name=name,
+        quantity=quantity,
+        unit=unit,
+        notes=ingredient.notes,
+        category=ingredient.category,
+    )
+
 CATEGORY_ALIASES: dict[str, GroceryCategory] = {
     "protein": GroceryCategory.MEAT,
     "poultry": GroceryCategory.MEAT,
@@ -241,8 +293,8 @@ def _shop_quantity(canonical: str, mention_count: int, raw_quantities: list[str]
         return f"{total:g}"
 
     if mention_count > 1:
-        return f"{mention_count} uses this week — buy accordingly"
-    return "1"
+        return f"{mention_count} meals this week"
+    return ""
 
 
 class GroceryNormalizer:
@@ -251,7 +303,10 @@ class GroceryNormalizer:
 
     def consolidate_ingredients(self, ingredients: list[Ingredient]) -> list[ConsolidatedIngredient]:
         grouped: dict[str, ConsolidatedIngredient] = {}
-        for ing in ingredients:
+        for raw in ingredients:
+            ing = repair_ingredient(raw)
+            if ing is None:
+                continue
             canonical = canonicalize_name(ing.name)
             display = canonical.replace("_", " ").title()
             if canonical not in grouped:
