@@ -1,0 +1,54 @@
+# Cooked-food fridge life (days after cooking) for leftover / reuse planning.
+# Used to block unrealistic reuse (e.g. Monday salmon -> Friday dinner).
+
+categories:
+  seafood:
+    fridge_days: 2
+    keywords:
+      - salmon
+      - fish
+      - shrimp
+      - tuna
+      - cod
+      - halibut
+      - seafood
+      - crab
+      - scallop
+  poultry:
+    fridge_days: 3
+    keywords:
+      - chicken
+      - turkey
+      - poultry
+  red_meat:
+    fridge_days: 4
+    keywords:
+      - beef
+      - steak
+      - pork
+      - lamb
+      - meatball
+  egg_dish:
+    fridge_days: 3
+    keywords:
+      - egg
+      - frittata
+      - quiche
+      - scramble
+  vegetarian:
+    fridge_days: 5
+    keywords:
+      - lentil
+      - bean
+      - tofu
+      - veggie
+      - vegetable
+      - soup
+      - stew
+      - curry
+      - pasta
+      - grain bowl
+      - stir fry
+  default:
+    fridge_days: 3
+    keywords: []

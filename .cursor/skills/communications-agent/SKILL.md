@@ -1,42 +1,40 @@
 ---
 name: communications-agent
-description: Guide for the Communications Agent — SMS approval, daily summaries, feedback. Use when editing communications agent, SMS backends, or send-daily/process-feedback CLI.
+description: Guide for the Communications Agent — Slack/Discord/Telegram/iMessage approval, daily summaries, feedback. Use when editing communications agent, comms backends, watch-messages, or process-feedback CLI.
 ---
 
 # Communications Agent
 
-## Role
+## Purpose
 
-Send approval requests and daily meal summaries via SMS; parse feedback and approvals; update preferences.
+Send approval requests and daily meal summaries; parse feedback and approvals; update preferences.
 
 ## Key files
 
 - `src/mealprepper/agents/communications.py`
-- `src/mealprepper/skills/sms/` — pluggable backends (console default)
-- `src/mealprepper/skills/comms_formatter.py` — SMS text formatting
-- `src/mealprepper/skills/feedback_collector.py` — parse inbound messages
-- `src/mealprepper/skills/preference_learner.py` — apply feedback to profile
+- `src/mealprepper/skills/comms/` — outbound backends
+- `src/mealprepper/skills/comms/slack_bot.py` — inbound Slack Socket Mode listener
+- `src/mealprepper/skills/comms/bot_commands.py` — command dispatch
+- `docs/SLACK_BOT.md` — full Slack app setup
 
-## SMS backends
+## Outbound (`COMMS_BACKEND`)
 
-Set `SMS_BACKEND` in `.env`:
+`console` | `slack` | `discord` | `telegram` | `imessage`
 
-| Value | Behavior |
-|-------|----------|
-| `console` | Print to stdout (dev default) |
-| `twilio` | Twilio REST API (recommended on Linux servers) |
-| `apple_shortcuts` | Webhook to macOS Shortcuts |
-| `imsg` | macOS-only stub for native iMessage |
-
-## CLI
+## Inbound Slack bot
 
 ```bash
-mealprepper send-daily [--date YYYY-MM-DD]
-mealprepper process-feedback -m "APPROVE"
-mealprepper process-feedback -m "loved sheet pan chicken"
-mealprepper watch-messages   # stub
+pip install -e ".[slack]"
+mealprepper watch-messages
 ```
 
-## Approval flow
+Requires `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, optional `SLACK_CHANNEL_ID`.
 
-After `plan-week`, agent sends SMS summary. User replies `APPROVE` → plan status becomes `approved` → `generate-grocery` can run.
+Bot commands: `approve`, `reject`, `status`, `plan`, `daily`, `grocery`, `help`, `loved <meal>`.
+
+## CLI fallback
+
+```bash
+mealprepper process-feedback -m "APPROVE"
+mealprepper process-feedback -m "loved sheet pan chicken"
+```

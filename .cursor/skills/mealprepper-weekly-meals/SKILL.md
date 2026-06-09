@@ -12,13 +12,13 @@ Orchestrate weekly meal planning for a family with toddler (3), infant BLW (7.5m
 ## Key files
 
 - Agent: `src/mealprepper/agents/weekly_meals.py`
-- Skills: `src/mealprepper/skills/meal_finder.py`, `week_organizer.py`, `ingredient_synergy.py`
+- Skills: `src/mealprepper/skills/meal_finder.py`, `week_organizer.py`, `ingredient_synergy.py`, `food_groups.py`
 - Models: `src/mealprepper/models/meals.py`, `plans.py`
 - Config: `config/family.yaml`
 
 ## Constraints (always enforce)
 
-- Toddler: no spicy; dinner by 5:30pm; max 45min total prep+cook; quick lunches
+- Toddler: no spicy; dinner by 5:30pm; max 45min total prep+cook; quick lunches; all five food groups
 - Infant: BLW finger foods with safe-size prep guidance
 - Adults: variable breakfast; bulk-preppable lunches; shared dinners with toddler
 - Minimize wasted ingredients — overlap produce/proteins across meals

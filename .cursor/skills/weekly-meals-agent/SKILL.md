@@ -13,6 +13,7 @@ Find age-appropriate meals, organize the week across all meal blocks, synergize 
 
 - `src/mealprepper/agents/weekly_meals.py` — agent + `plan_week()`
 - `src/mealprepper/skills/meal_finder.py` — LLM meal outline + recipe expansion
+- `src/mealprepper/skills/food_groups.py` — toddler food group balance
 - `src/mealprepper/skills/week_organizer.py` — weekly structure + playbook
 - `src/mealprepper/skills/ingredient_synergy.py` — overlap analysis
 - `config/family.yaml` — member constraints and meal blocks

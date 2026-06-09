@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4"]
-twilio = ["twilio>=9.0"]
+slack = ["slack-sdk>=3.27"]
 
 [project.scripts]
 mealprepper = "mealprepper.cli:app"

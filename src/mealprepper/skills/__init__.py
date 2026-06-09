@@ -6,7 +6,7 @@ from mealprepper.skills.inventory import InventorySkill
 from mealprepper.skills.meal_finder import MealFinderSkill
 from mealprepper.skills.playbook_renderer import PlaybookRendererSkill
 from mealprepper.skills.preference_learner import PreferenceLearnerSkill
-from mealprepper.skills.sms import SMSCommunicatorSkill, get_sms_backend
+from mealprepper.skills.comms import CommsCommunicatorSkill, get_comms_backend
 from mealprepper.skills.week_organizer import WeekOrganizerSkill
 
 __all__ = [
@@ -19,6 +19,6 @@ __all__ = [
     "CommsFormatterSkill",
     "FeedbackCollectorSkill",
     "PreferenceLearnerSkill",
-    "SMSCommunicatorSkill",
-    "get_sms_backend",
+    "CommsCommunicatorSkill",
+    "get_comms_backend",
 ]

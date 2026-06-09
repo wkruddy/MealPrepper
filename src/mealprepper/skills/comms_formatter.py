@@ -6,7 +6,7 @@ from mealprepper.models.plans import DailyPlanSummary, WeeklyPlan
 
 
 class CommsFormatterSkill:
-    """Format SMS-friendly summaries for approvals and daily reminders."""
+    """Format notification-friendly summaries for approvals and daily reminders."""
 
     def format_approval(self, plan: WeeklyPlan) -> str:
         lines = [

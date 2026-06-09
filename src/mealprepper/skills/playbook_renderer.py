@@ -55,6 +55,22 @@ class PlaybookRendererSkill:
             lines.append("")
         return "\n".join(lines).strip() + "\n"
 
+    def render_full_recipes(self, plan: WeeklyPlan) -> str:
+        """Full recipes with ingredients, steps, and family modifications."""
+        lines = [
+            f"# Recipes — {plan.week_start} — {plan.week_end}",
+            "",
+        ]
+        for day in DAYS:
+            day_meals = [m for m in plan.meals if m.day == day]
+            if not day_meals:
+                continue
+            lines.append(f"## {day.title()}")
+            for meal in day_meals:
+                lines.extend(self._full_recipe_section(meal))
+            lines.append("")
+        return "\n".join(lines).strip() + "\n"
+
     def render_approval_summary(self, plan: WeeklyPlan, max_meals: int = 12) -> str:
         lines = [
             f"Week {plan.week_start} — {plan.week_end}",
@@ -71,6 +87,48 @@ class PlaybookRendererSkill:
             lines.append(f"\nSynergy: {plan.synergy_notes[:200]}")
         return "\n".join(lines)
 
+    def _full_recipe_section(self, meal: PlannedMeal) -> list[str]:
+        r = meal.recipe
+        block = meal.meal_block.replace("_", " ").title()
+        lines = [f"### {block}: {r.title}"]
+        if meal.cook_note:
+            lines.append(f"_{meal.cook_note}_")
+        if r.description:
+            lines.append(r.description)
+        lines.append(
+            f"**Time:** prep {r.prep_minutes}m | cook {r.cook_minutes}m | serves {r.servings}"
+        )
+        lines.append("")
+        if r.ingredients:
+            lines.append("**Ingredients**")
+            for ingredient in r.ingredients:
+                qty = " ".join(
+                    part for part in [ingredient.quantity, ingredient.unit] if part
+                ).strip()
+                if qty:
+                    lines.append(f"- {ingredient.name} — {qty}")
+                else:
+                    lines.append(f"- {ingredient.name}")
+            lines.append("")
+        if r.steps:
+            lines.append("**Steps**")
+            for step in sorted(r.steps, key=lambda item: item.order):
+                suffix = f" ({step.duration_minutes}m)" if step.duration_minutes else ""
+                lines.append(f"{step.order}. {step.instruction}{suffix}")
+            lines.append("")
+        if r.food_groups and any(r.food_groups.values()):
+            groups = " | ".join(
+                f"{group.title()}: {value or '—'}"
+                for group, value in r.food_groups.items()
+            )
+            lines.append(f"**Food groups:** {groups}")
+        if r.toddler_modifications:
+            lines.append(f"**Toddler:** {r.toddler_modifications}")
+        if r.infant_guidance:
+            lines.append(f"**Infant BLW:** {r.infant_guidance}")
+        lines.append("")
+        return lines
+
     def _meal_section(self, meal: PlannedMeal) -> list[str]:
         r = meal.recipe
         lines = [
@@ -82,6 +140,12 @@ class PlaybookRendererSkill:
                 f"{i.name} ({i.quantity} {i.unit})".strip() for i in r.ingredients[:8]
             )
             lines.append(f"- Ingredients: {ing}")
+        if r.food_groups and any(r.food_groups.values()):
+            groups = " | ".join(
+                f"{group.title()}: {value or '—'}"
+                for group, value in r.food_groups.items()
+            )
+            lines.append(f"- Food groups: {groups}")
         if r.infant_guidance:
             lines.append(f"- Infant BLW: {r.infant_guidance}")
         if r.toddler_modifications:

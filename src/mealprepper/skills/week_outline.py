@@ -333,5 +333,8 @@ def finalize_outline(
         varied = CookEfficiencySkill(cfg).apply_to_outlines(varied)
         min_unique = cfg.min_unique_per_block
     result = ensure_minimum_variety(varied, catalog, min_unique=min_unique)
+    from mealprepper.skills.food_shelf_life import FoodShelfLifeSkill
+
+    result = FoodShelfLifeSkill().validate_outlines(result, catalog)
     log_outline_summary(result)
     return result

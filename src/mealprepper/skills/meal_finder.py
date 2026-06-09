@@ -14,8 +14,10 @@ from mealprepper.models.family import FamilyProfile
 from mealprepper.models.feedback import PreferenceProfile
 from mealprepper.models.meals import MealRecipe, PlannedMeal, RecipeStep
 from mealprepper.skills.blw_safety import BLWSafety
+from mealprepper.skills.food_groups import FoodGroupsSkill
 from mealprepper.skills.meal_blocks import DAYS, WeekMealOutline
 from mealprepper.skills.meal_catalog import MealCatalog
+from mealprepper.skills.recipe_repository import RecipeRepositorySkill
 from mealprepper.skills.week_outline import finalize_outline, parse_outline_items, required_slots
 from mealprepper.storage.sqlite import SQLiteStore
 
@@ -64,10 +66,13 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
         self.meal_top_k = int(index_cfg.get("meal_top_k", 5))
         self.feedback_top_k = int(index_cfg.get("feedback_top_k", 8))
         self.max_meal_repeat = int(planning_cfg.get("max_meal_repeat_days", 2))
+        self.recipe_top_k = int(index_cfg.get("recipe_top_k", 6))
         self.catalog = MealCatalog(self.settings)
+        self.recipe_repo = RecipeRepositorySkill(store=self.store, llm=self.llm, settings=self.settings)
         from mealprepper.skills.cook_efficiency import CookEfficiencyConfig
 
         self.cook_efficiency = CookEfficiencyConfig.from_settings(self.settings)
+        self.food_groups = FoodGroupsSkill(self.settings)
 
     def find_week_outline(
         self,
@@ -98,6 +103,8 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
                 "- Plan ~4 unique adult dinners for the week; repeat them on other nights.\n"
                 "- Each dinner should yield next-day adult lunch leftovers (same title).\n"
                 "- Batch-friendly meals: sheet pan, stir fry, roast chicken, grain bowls, tacos.\n"
+                "- Seafood leftovers keep ~2 days; poultry ~3; most veg/grain dishes ~4-5.\n"
+                "- Do not plan leftover seafood more than 1 day after cooking.\n"
                 "- Saturday bulk_meal_prep should prep components reused in weekday meals.\n"
                 f"- Same title may repeat up to {self.max_meal_repeat} times per block.",
                 priority=13,
@@ -111,10 +118,27 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
                 priority=13,
             )
         builder.add_section("BLW safety", blw.prompt_context(), priority=14)
+        builder.add_section(
+            "Food groups (toddler meals)",
+            self.food_groups.prompt_context(strict=True),
+            priority=14,
+        )
+        builder.add_section(
+            "Food groups (adult meals)",
+            self.food_groups.prompt_context(strict=False),
+            priority=15,
+        )
         builder.add_section("Preferences", compact_prefs.to_prompt_context(), priority=20)
         if feedback_ctx:
             builder.add_section("Recent feedback", feedback_ctx, priority=25)
         builder.add_section("Block style guide", self.catalog.prompt_style_guide(), priority=35)
+        saved_recipes = self.recipe_repo.search_for_planning()
+        if saved_recipes:
+            builder.add_section(
+                "Family recipe library",
+                self.recipe_repo.format_for_outline(saved_recipes),
+                priority=33,
+            )
         builder.add_section("Past meals to reuse or vary", past_meals_text, priority=40)
         if plan_ctx:
             builder.add_section("Past weeks", plan_ctx, priority=50)
@@ -160,12 +184,20 @@ Cover every required block for each day.""",
 
     def expand_recipe(self, outline: WeekMealOutline, family: FamilyProfile) -> MealRecipe:
         blw = BLWSafety(family, self.settings)
+        saved = self.recipe_repo.match_outline(outline)
+        if saved and saved.has_full_recipe():
+            logger.info("Using saved family recipe for %s: %s", outline.meal_block, saved.title)
+            recipe = saved.to_meal_recipe(outline.title)
+            return self._apply_block_safety(recipe, outline, blw)
+
         relevant = self.meal_index.search(
             outline.title,
             meal_block=outline.meal_block,
             top_k=2,
         )
         past_hint = self.meal_index.format_for_prompt(relevant) if relevant else ""
+        saved_matches = self.recipe_repo.search(outline.title, meal_block=outline.meal_block, top_k=2)
+        saved_hint = self.recipe_repo.format_for_prompt(saved_matches) if saved_matches else ""
 
         builder = PromptBuilder(
             budget=self.budget,
@@ -182,14 +214,29 @@ Cover every required block for each day.""",
         builder.add_section(
             "Fields",
             "title, description, prep_minutes, cook_minutes, servings, ingredients (name, quantity, unit, category), "
-            "steps (order, instruction, duration_minutes), tags, infant_guidance, toddler_modifications.",
+            "steps (order, instruction, duration_minutes), tags, food_groups (carb/protein/veggie/fruit/fat → ingredient), "
+            "infant_guidance, toddler_modifications.",
             priority=10,
         )
+        if self.food_groups.strict_for_block(outline.meal_block):
+            builder.add_section(
+                "Food groups",
+                self.food_groups.prompt_context(strict=True),
+                priority=12,
+            )
+        elif self.food_groups.note_for_block(outline.meal_block):
+            builder.add_section(
+                "Food groups",
+                self.food_groups.prompt_context(strict=False),
+                priority=12,
+            )
         builder.add_section("Family context", self._family_context(family), priority=20)
         if outline.meal_block == "infant_blw":
             builder.add_section("BLW safety", blw.prompt_context(), priority=15)
         if past_hint:
             builder.add_section("Similar past recipes", past_hint, priority=40)
+        if saved_hint:
+            builder.add_section("Saved family recipes", saved_hint, priority=38)
 
         try:
             recipe = self.llm.chat_json(
@@ -275,7 +322,7 @@ Cover every required block for each day.""",
         elif outline.meal_block.startswith("toddler"):
             if not recipe.toddler_modifications:
                 recipe.toddler_modifications = "No spice; bite-sized pieces; check salt."
-        return recipe
+        return self.food_groups.annotate_recipe(recipe, outline.meal_block)
 
     def _family_context(self, family: FamilyProfile) -> str:
         lines = []

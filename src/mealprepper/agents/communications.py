@@ -10,7 +10,7 @@ from mealprepper.skills.comms_formatter import CommsFormatterSkill
 from mealprepper.skills.feedback_collector import FeedbackCollectorSkill
 from mealprepper.skills.playbook_renderer import PlaybookRendererSkill
 from mealprepper.skills.preference_learner import PreferenceLearnerSkill
-from mealprepper.skills.sms import SMSCommunicatorSkill
+from mealprepper.skills.comms import CommsCommunicatorSkill
 from mealprepper.storage.sqlite import SQLiteStore
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 COMMUNICATIONS_SYSTEM = """You are the Communications Agent for MealPrepper.
 
 Your responsibilities:
-- Send weekly plan approval requests via SMS
+- Send weekly plan approval requests via Slack/Discord/Telegram/iMessage
 - Send daily morning meal summaries
 - Parse feedback and approval replies
 - Coordinate with preference learning
@@ -34,7 +34,7 @@ class CommunicationsAgent(BaseAgent):
     def __init__(
         self,
         store: SQLiteStore | None = None,
-        sms: SMSCommunicatorSkill | None = None,
+        comms: CommsCommunicatorSkill | None = None,
         formatter: CommsFormatterSkill | None = None,
         feedback: FeedbackCollectorSkill | None = None,
         preferences: PreferenceLearnerSkill | None = None,
@@ -42,7 +42,7 @@ class CommunicationsAgent(BaseAgent):
         **kwargs,
     ) -> None:
         self.store = store or SQLiteStore()
-        self.sms = sms or SMSCommunicatorSkill()
+        self.comms = comms or CommsCommunicatorSkill()
         self.formatter = formatter or CommsFormatterSkill()
         self.feedback = feedback or FeedbackCollectorSkill()
         self.preferences = preferences or PreferenceLearnerSkill(self.store)
@@ -51,9 +51,9 @@ class CommunicationsAgent(BaseAgent):
         super().__init__(**kwargs)
 
     def _register_tools(self) -> None:
-        self.register_tool("send_approval", "SMS weekly plan for approval", self._send_approval)
-        self.register_tool("send_daily", "SMS today's meal summary", self._send_daily)
-        self.register_tool("parse_feedback", "Parse SMS feedback text", self._parse_feedback)
+        self.register_tool("send_approval", "Notify family that weekly plan needs approval", self._send_approval)
+        self.register_tool("send_daily", "Send today's meal summary", self._send_daily)
+        self.register_tool("parse_feedback", "Parse feedback or approval text", self._parse_feedback)
         self.register_tool(
             "process_preferences", "Apply pending feedback to preferences", self._process_prefs
         )
@@ -108,16 +108,24 @@ class CommunicationsAgent(BaseAgent):
 
     def _send_approval(self, plan: WeeklyPlan, summary: str | None = None, **_) -> bool:
         body = summary or self.formatter.format_approval(plan)
-        return self.sms.send_approval_request(body)
+        return self.comms.send_approval_request(body)
 
     def _send_daily(self, target: date | None = None, **_) -> bool:
         target = target or date.today()
         plan = self.store.get_plan_for_date(target)
         if not plan:
-            return self.sms.send_daily_plan(f"No active plan for {target.isoformat()}.")
+            latest = self.store.get_latest_plan(PlanStatus.APPROVED)
+            if latest:
+                body = (
+                    f"No active plan for {target.isoformat()}. "
+                    f"Latest approved plan covers {latest.week_start} — {latest.week_end}."
+                )
+            else:
+                body = f"No active plan for {target.isoformat()}."
+            return self.comms.send_daily_plan(body)
         summary = self.formatter.daily_summary_from_plan(plan, target)
         body = self.formatter.format_daily_summary(summary)
-        return self.sms.send_daily_plan(body)
+        return self.comms.send_daily_plan(body)
 
     def _parse_feedback(self, text: str, meal_title: str = "", **kwargs):
         return self.feedback.parse_message(text, meal_title=meal_title, **kwargs)

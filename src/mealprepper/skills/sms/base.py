@@ -1,11 +1,7 @@
-from __future__ import annotations
+"""Backward-compatible re-exports — prefer mealprepper.skills.comms.base."""
 
-from abc import ABC, abstractmethod
+from mealprepper.skills.comms.base import CommsBackend
 
+SMSBackend = CommsBackend
 
-class SMSBackend(ABC):
-    """Protocol for pluggable SMS delivery backends."""
-
-    @abstractmethod
-    def send(self, to: str, body: str) -> bool:
-        ...
+__all__ = ["CommsBackend", "SMSBackend"]

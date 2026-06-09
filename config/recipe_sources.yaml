@@ -1,0 +1,191 @@
+# Family recipe sources — sync with: mealprepper sync-recipes
+# Generated from Trello export via scripts/trello_to_recipe_sources.py
+#
+# Supported types:
+#   file          — markdown/text file
+#   url           — recipe page (fetched on sync)
+#   text          — inline meal idea (no URL or full recipe yet)
+
+sources:
+  - type: text
+    title: "Zucchini eggplant lasagna"
+    text: "Zucchini eggplant lasagna"
+    label: "Trello: Dinner: Zucchini eggplant lasagna"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Zucchini Boats (Turkey or Beef) + Orzo/Couscous"
+    text: "Zucchini Boats (Turkey or Beef) + Orzo/Couscous"
+    label: "Trello: Dinner: Zucchini Boats (Turkey or Beef) + Orzo/Couscous"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Tilapia Tacos"
+    text: "Tilapia Tacos"
+    label: "Trello: Dinner: Tilapia Tacos"
+    meal_blocks: "adult_dinner"
+  - type: url
+    url: "https://frommybowl.com/vegan-sheet-pan-quesadillas/"
+    label: "Quesadilla Sheet Bake"
+    notes: "Note: Except don't make it vegan."
+  - type: file
+    path: "../ai-data/mealprepper/recipes/steak-and-cheese-subs.md"
+    label: "Steak and Cheese Subs"
+  - type: text
+    title: "Grilled Chicken on big Salad"
+    text: "Grilled Chicken on big Salad"
+    label: "Trello: Dinner: Grilled Chicken on big Salad"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Blackened Chicken + roasted fingerling potatoez + cauliflower + tatziki"
+    text: "Blackened Chicken + roasted fingerling potatoez + cauliflower + tatziki"
+    label: "Trello: Dinner: Blackened Chicken + roasted fingerling potatoez + cauliflower + tatziki"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Chicken Wontons and Fancy Ramen"
+    text: "Chicken Wontons and Fancy Ramen"
+    label: "Trello: Dinner: Chicken Wontons and Fancy Ramen"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Winter Salad Wednesday"
+    text: "Winter Salad Wednesday"
+    label: "Trello: Winter Salad Wednesday"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Butter garlic Shrimp scampi + red lentil noodle"
+    text: "Butter garlic Shrimp scampi + red lentil noodle"
+    label: "Trello: Dinner: Butter garlic Shrimp scampi + red lentil noodle"
+    meal_blocks: "adult_dinner"
+  - type: url
+    url: "https://imhungryforthat.com/taco-casserole-with-tortillas/"
+    label: "Ground meat taco bowl casserole"
+  - type: text
+    title: "Pulled chicken sandwiches with red cabbage slaw"
+    text: "Pulled chicken sandwiches with red cabbage slaw"
+    label: "Trello: Dinner: Pulled chicken sandwiches with red cabbage slaw"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Ground Turkey Stuffed Peppers"
+    text: "Ground Turkey Stuffed Peppers"
+    label: "Trello: Dinner: Ground Turkey Stuffed Peppers"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Cheeseburger Casserole"
+    text: "Cheeseburger Casserole"
+    label: "Trello: Dinner: Cheeseburger Casserole"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "BBQ Rib sandwiches + roasted cauliflower"
+    text: "BBQ Rib sandwiches + roasted cauliflower"
+    label: "Trello: Dinner: BBQ Rib sandwiches + roasted cauliflower"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "American Chop Suey"
+    text: "American Chop Suey"
+    label: "Trello: Dinner: American Chop Suey"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Baked Tilapia + orzo + asparagus"
+    text: "Baked Tilapia + orzo + asparagus"
+    label: "Trello: Dinner: Baked Tilapia + orzo + asparagus"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Tofu, Broccoli, carrots, rice, bell peppers for stir fry"
+    text: "Tofu, Broccoli, carrots, rice, bell peppers for stir fry"
+    label: "Trello: Dinner: Tofu, Broccoli, carrots, rice, bell peppers for stir fry"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Salmon + cauliflower + roasted fingerlings"
+    text: "Salmon + cauliflower + roasted fingerlings"
+    label: "Trello: Dinner: Salmon + cauliflower + roasted fingerlings"
+    meal_blocks: "adult_dinner"
+  - type: url
+    url: "https://avarecipes.com/chicken-stuffing-bake-recipe/"
+    label: "Chicken stuffing bake"
+  - type: url
+    url: "https://life-in-the-lofthouse.com/sweet-and-sour-chicken-casserole/"
+    label: "Sweet & Sour Chicken Bake"
+  - type: url
+    url: "https://www.dinneratthezoo.com/chicken-broccoli-casserole/"
+    label: "Chicken broccoli casserole"
+    notes: "Alternate links: https://thecozycook.com/easy-cheesy-chicken-noodle-casserole/"
+  - type: url
+    url: "https://www.eatwell101.com/baked-tuscan-chicken-casserole-recipe"
+    label: "Tuscan chicken casserole"
+  - type: url
+    url: "https://4sonrus.com/chicken-tamale-casserole/"
+    label: "Chicken tamale casserole?"
+  - type: url
+    url: "https://bakeatmidnite.com/italian-chicken-casserole/#recipe"
+    label: "Italian chicken casserole"
+  - type: url
+    url: "https://shesnotcookin.com/chicken-pot-pie-casserole-recipe/"
+    label: "Chicken cordon bleu casserole"
+    notes: "Alternate links: https://hildaskitchenblog.com/recipe/chicken-cordon-bleu-casserole/, https://gatherinmykitchen.com/million-dollar-chicken-casserole/"
+  - type: text
+    title: "Beef stroganoff"
+    text: "Beef stroganoff"
+    label: "Trello: Beef stroganoff"
+    meal_blocks: "adult_dinner"
+  - type: url
+    url: "https://www.ethanchlebowski.com/cooking-techniques-recipes/15-minute-triple-smash-burger-with-bacon"
+    label: "Smash burger"
+    notes: "Alternate links: https://www.ethanchlebowski.com/cooking-techniques-recipes/the-smash-burger-manifesto"
+  - type: text
+    title: "Beef Chili"
+    text: "Beef Chili"
+    label: "Trello: Beef Chili"
+    meal_blocks: "adult_dinner"
+  - type: text
+    title: "Falafel + tofu + tatziki (Mediterranean bowls lunch)"
+    text: "Falafel + tofu + tatziki (Mediterranean bowls lunch)"
+    label: "Trello: Lunch: Falafel + tofu + tatziki (Mediterranean bowls lunch)"
+    meal_blocks: "toddler_school_lunch"
+  - type: text
+    title: "Hardboiled Eggs"
+    text: "Hardboiled Eggs"
+    label: "Trello: Lunch: Hardboiled Eggs"
+    meal_blocks: "toddler_school_lunch"
+  - type: text
+    title: "Tuna Salad Wrap/Boat"
+    text: "Tuna Salad Wrap/Boat"
+    label: "Trello: Lunch: Tuna Salad Wrap/Boat"
+    meal_blocks: "toddler_school_lunch"
+  - type: text
+    title: "Chicken Salad"
+    text: "Chicken Salad"
+    label: "Trello: Lunch: Chicken Salad"
+    meal_blocks: "toddler_school_lunch"
+  - type: text
+    title: "Rice & Beans"
+    text: "Rice & Beans"
+    label: "Trello: Lunch: Rice & Beans"
+    meal_blocks: "toddler_school_lunch"
+  - type: text
+    title: "Banana Muffins"
+    text: "Banana Muffins"
+    label: "Trello: Breakfast: Banana Muffins"
+    meal_blocks: "toddler_breakfast"
+  - type: text
+    title: "Sweet Potato Pancakes"
+    text: "Sweet Potato Pancakes"
+    label: "Trello: Breakfast: Sweet Potato Pancakes"
+    meal_blocks: "toddler_breakfast"
+  - type: text
+    title: "Banana Oat Bake"
+    text: "Banana Oat Bake"
+    label: "Trello: Breakfast: Banana Oat Bake"
+    meal_blocks: "toddler_breakfast"
+  - type: text
+    title: "Watermelon Cubes"
+    text: "Watermelon Cubes"
+    label: "Trello: Breakfast: Watermelon Cubes"
+    meal_blocks: "toddler_breakfast"
+  - type: text
+    title: "Zucchini Waffles"
+    text: "Zucchini Waffles"
+    label: "Trello: Breakfast: Zucchini Waffles"
+    meal_blocks: "toddler_breakfast"
+  - type: text
+    title: "Toddler Apple Crisp"
+    text: "Toddler Apple Crisp"
+    label: "Trello: Breakfast: Toddler Apple Crisp"
+    meal_blocks: "toddler_breakfast"

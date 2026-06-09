@@ -63,8 +63,46 @@ install_job "plan-week" "weekly plan (Saturday 10:00)" "Sat *-*-* 10:00:00" "wee
 # Sunday 08:00 — grocery list
 install_job "generate-grocery" "grocery list (Sunday 08:00)" "Sun *-*-* 08:00:00" "grocery"
 
-# Daily 07:00 — morning SMS
+# Daily 07:00 — morning notification
 install_job "send-daily" "daily reminder (07:00)" "*-*-* 07:00:00" "daily"
+
+install_watch_service() {
+  local service="$UNIT_DIR/mealprepper-watch-messages.service"
+  local python="${ROOT}/.venv/bin/python"
+  if [[ ! -x "$python" ]]; then
+    python="$(command -v python3)"
+  fi
+
+  cat > "$service" <<EOF
+[Unit]
+Description=MealPrepper Slack bot listener (watch-messages)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${ROOT}
+EnvironmentFile=-${ROOT}/.env
+ExecStart=${python} -m mealprepper watch-messages
+Restart=on-failure
+RestartSec=15
+StandardOutput=append:${ROOT}/data/logs/watch-messages.log
+StandardError=append:${ROOT}/data/logs/watch-messages.err
+
+[Install]
+WantedBy=default.target
+EOF
+
+  systemctl --user daemon-reload
+  echo ""
+  echo "Slack bot service written (not auto-enabled). Background listener:"
+  echo "  pip install -e '.[slack]'   # if not already"
+  echo "  systemctl --user enable --now mealprepper-watch-messages.service"
+  echo "  systemctl --user status mealprepper-watch-messages.service"
+  echo "  tail -f ${ROOT}/data/logs/watch-messages.log"
+}
+
+install_watch_service
 
 echo ""
 echo "Done. Logs: $ROOT/data/logs/"

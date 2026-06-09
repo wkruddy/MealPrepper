@@ -26,6 +26,7 @@ class MealRecipe(BaseModel):
     ingredients: list[Ingredient] = Field(default_factory=list)
     steps: list[RecipeStep] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    food_groups: dict[str, str] = Field(default_factory=dict)
     infant_guidance: str = ""
     toddler_modifications: str = ""
 

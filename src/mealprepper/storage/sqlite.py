@@ -12,6 +12,8 @@ from typing import Iterator
 from mealprepper.config import Settings, get_settings
 from mealprepper.models.feedback import FeedbackRating, MealFeedback, PreferenceProfile
 from mealprepper.models.grocery import GroceryList
+from mealprepper.models.meals import MealRecipe
+from mealprepper.models.recipe_repository import SavedRecipe
 from mealprepper.models.plans import PlanStatus, WeeklyPlan
 
 logger = logging.getLogger(__name__)
@@ -136,6 +138,24 @@ class SQLiteStore:
                     summary TEXT,
                     body TEXT
                 );
+
+                CREATE TABLE IF NOT EXISTS recipe_repository (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    source_url TEXT,
+                    source_label TEXT,
+                    content_hash TEXT,
+                    raw_text TEXT,
+                    recipe_json TEXT,
+                    meal_blocks TEXT,
+                    tags TEXT,
+                    notes TEXT,
+                    favorite INTEGER DEFAULT 1,
+                    body TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 """
             )
             self._migrate_fts(conn)
@@ -157,6 +177,11 @@ class SQLiteStore:
                 "plan_index_fts",
                 "plan_index",
                 "plan_id, week_start, week_end, status, summary, body",
+            ),
+            (
+                "recipe_repository_fts",
+                "recipe_repository",
+                "title, meal_blocks, tags, notes, source_label, body",
             ),
         ]
         for fts_name, content_table, columns in fts_defs:
@@ -201,6 +226,11 @@ class SQLiteStore:
                 "plan_index",
                 "plan_index_fts",
                 "plan_id, week_start, week_end, status, summary, body",
+            ),
+            (
+                "recipe_repository",
+                "recipe_repository_fts",
+                "title, meal_blocks, tags, notes, source_label, body",
             ),
         ]
         for content_table, fts_table, columns in trigger_defs:
@@ -305,15 +335,28 @@ class SQLiteStore:
         return WeeklyPlan.model_validate(json.loads(row["payload"]))
 
     def get_plan_for_date(self, target: date) -> WeeklyPlan | None:
+        """Return the best approved/active plan whose date range includes target."""
+        active_statuses = {PlanStatus.APPROVED, PlanStatus.ACTIVE}
+        covering: list[WeeklyPlan] = []
         with self._conn() as conn:
             rows = conn.execute(
                 "SELECT payload FROM weekly_plans ORDER BY created_at DESC"
             ).fetchall()
         for row in rows:
             plan = WeeklyPlan.model_validate(json.loads(row["payload"]))
-            if plan.week_start <= target <= plan.week_end:
-                return plan
-        return None
+            if plan.week_start <= target <= plan.week_end and plan.status in active_statuses:
+                covering.append(plan)
+        if not covering:
+            return None
+        status_rank = {PlanStatus.ACTIVE: 2, PlanStatus.APPROVED: 1}
+        covering.sort(
+            key=lambda plan: (
+                status_rank.get(plan.status, 0),
+                plan.approved_at or plan.created_at or datetime.min.replace(tzinfo=timezone.utc),
+            ),
+            reverse=True,
+        )
+        return covering[0]
 
     def list_recent_plans(self, limit: int = 10) -> list[WeeklyPlan]:
         with self._conn() as conn:
@@ -523,6 +566,86 @@ class SQLiteStore:
                 "SELECT * FROM approval_requests WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1"
             ).fetchone()
         return dict(row) if row else None
+
+    def save_saved_recipe(self, recipe: SavedRecipe) -> SavedRecipe:
+        from mealprepper.index.recipe_index import RecipeIndex
+
+        recipe_id = recipe.id or str(uuid.uuid4())
+        now = _utcnow()
+        recipe.id = recipe_id
+        recipe.created_at = recipe.created_at or now
+        recipe.updated_at = now
+        RecipeIndex(db_path=self.db_path, settings=self.settings).index_recipe(recipe)
+        return recipe
+
+    def get_saved_recipe(self, recipe_id: str) -> SavedRecipe | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM recipe_repository WHERE id = ?",
+                (recipe_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return self._row_to_saved_recipe(row)
+
+    def find_saved_recipe_by_hash(self, content_hash: str) -> SavedRecipe | None:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM recipe_repository WHERE content_hash = ? ORDER BY updated_at DESC LIMIT 1",
+                (content_hash,),
+            ).fetchone()
+        if not row:
+            return None
+        return self._row_to_saved_recipe(row)
+
+    def list_saved_recipes(self, limit: int = 50) -> list[SavedRecipe]:
+        with self._conn() as conn:
+            if limit <= 0:
+                rows = conn.execute(
+                    "SELECT * FROM recipe_repository ORDER BY updated_at DESC",
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM recipe_repository ORDER BY updated_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [self._row_to_saved_recipe(row) for row in rows]
+
+    def delete_saved_recipe(self, recipe_id: str) -> bool:
+        with self._conn() as conn:
+            cursor = conn.execute(
+                "DELETE FROM recipe_repository WHERE id = ?",
+                (recipe_id,),
+            )
+            return cursor.rowcount > 0
+
+    @staticmethod
+    def _row_to_saved_recipe(row: sqlite3.Row) -> SavedRecipe:
+        recipe = None
+        if row["recipe_json"]:
+            recipe = MealRecipe.model_validate(json.loads(row["recipe_json"]))
+        meal_blocks = [part for part in (row["meal_blocks"] or "").split(",") if part]
+        tags = [part for part in (row["tags"] or "").split(",") if part]
+        key_ingredients = []
+        if recipe:
+            key_ingredients = [ing.name for ing in recipe.ingredients[:8]]
+        return SavedRecipe(
+            id=row["id"],
+            title=row["title"],
+            source_type=row["source_type"],
+            source_url=row["source_url"] or "",
+            source_label=row["source_label"] or "",
+            content_hash=row["content_hash"] or "",
+            raw_text=row["raw_text"] or "",
+            recipe=recipe,
+            key_ingredients=key_ingredients,
+            meal_blocks=meal_blocks,
+            tags=tags,
+            notes=row["notes"] or "",
+            favorite=bool(row["favorite"]),
+            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
+            updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
+        )
 
 
 def ensure_db_schema(db_path: Path, settings: Settings | None = None) -> None:

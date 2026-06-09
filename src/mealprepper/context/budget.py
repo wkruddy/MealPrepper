@@ -9,6 +9,7 @@ from mealprepper.config import Settings, get_settings
 class CallType(str, Enum):
     MEAL_FINDER = "meal_finder"
     RECIPE_EXPAND = "recipe_expand"
+    RECIPE_IMPORT = "recipe_import"
     WEEK_ORGANIZER = "week_organizer"
     GROCERY = "grocery"
     COMMS = "comms"

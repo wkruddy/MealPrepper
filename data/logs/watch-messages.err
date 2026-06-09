@@ -1,0 +1,163 @@
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: fc41c20b-7467-4117-bd60-067fbf307c70)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: fc41c20b-7467-4117-bd60-067fbf307c70)
+INFO mealprepper.agents.base: [communications] running tool: parse_feedback
+ERROR mealprepper.skills.comms.slack_bot: Slack request handler failed
+Traceback (most recent call last):
+  File "/home/ettikit/ai-stack/MealPrepper/src/mealprepper/skills/comms/slack_bot.py", line 82, in _on_request
+    self._handle_event(req.payload)
+  File "/home/ettikit/ai-stack/MealPrepper/src/mealprepper/skills/comms/slack_bot.py", line 128, in _handle_event
+    self._post_reply(channel, event.get("thread_ts") or event.get("ts"), reply)
+  File "/home/ettikit/ai-stack/MealPrepper/src/mealprepper/skills/comms/slack_bot.py", line 172, in _post_reply
+    response = self.web_client.chat_postMessage(**kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/client.py", line 2823, in chat_postMessage
+    return self.api_call("chat.postMessage", json=kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/base_client.py", line 169, in api_call
+    return self._sync_send(api_url=api_url, req_args=req_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/base_client.py", line 200, in _sync_send
+    return self._urllib_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/base_client.py", line 331, in _urllib_api_call
+    ).validate()
+      ^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/slack_response.py", line 195, in validate
+    raise e.SlackApiError(message=msg, response=self)
+slack_sdk.errors.SlackApiError: The request to the Slack API failed. (url: https://slack.com/api/chat.postMessage)
+The server responded with: {'ok': False, 'error': 'cannot_reply_to_message'}
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 7589fcc1-69f6-4d35-98a1-d08809ea3be5)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 7589fcc1-69f6-4d35-98a1-d08809ea3be5)
+INFO mealprepper.agents.base: [communications] running tool: send_daily
+INFO mealprepper.skills.comms.slack: Slack webhook message sent
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 639339f2-742f-4dae-ba94-d8b299914b98)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 639339f2-742f-4dae-ba94-d8b299914b98)
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: dca41d53-2cb2-4db1-b11d-026648f0ecf1)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: dca41d53-2cb2-4db1-b11d-026648f0ecf1)
+INFO mealprepper.agents.base: [weekly_meals] running tool: load_preferences
+INFO mealprepper.agents.base: [weekly_meals] running tool: organize_week
+INFO mealprepper.skills.week_organizer: Organizing week 2026-06-08 — 2026-06-14
+INFO mealprepper.skills.meal_finder: Generating week outline for 2026-06-08 — 2026-06-14 (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama request: meal_finder (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: meal_finder (12.6s)
+WARNING mealprepper.skills.meal_finder: LLM meal finder failed, using catalog fallback: Too few valid outline items (19)
+INFO mealprepper.skills.cook_efficiency: Cook reuse: monday dinner -> tuesday lunch (Sheet Pan Lemon Herb Chicken)
+INFO mealprepper.skills.cook_efficiency: Cook reuse: tuesday dinner -> wednesday lunch (Beef & Broccoli Stir Fry)
+INFO mealprepper.skills.cook_efficiency: Cook reuse: wednesday dinner -> thursday lunch (Baked Salmon & Roasted Veg)
+INFO mealprepper.skills.cook_efficiency: Cook reuse: thursday dinner -> friday lunch (Mild Turkey Tacos)
+INFO mealprepper.skills.cook_efficiency: Cook reuse: friday dinner -> saturday lunch (Pasta Primavera)
+INFO mealprepper.skills.cook_efficiency: Cook reuse: saturday dinner -> sunday lunch (Sheet Pan Lemon Herb Chicken)
+INFO mealprepper.skills.cook_efficiency: Dinner repeat: tuesday -> friday (Beef & Broccoli Stir Fry)
+INFO mealprepper.skills.cook_efficiency: Dinner repeat: tuesday -> saturday (Beef & Broccoli Stir Fry)
+INFO mealprepper.skills.cook_efficiency: Dinner repeat: thursday -> sunday (Mild Turkey Tacos)
+INFO mealprepper.skills.cook_efficiency: Cook efficiency: 9 reuse links, 4 unique dinner cooks
+INFO mealprepper.skills.week_outline: Outline variety: adult_breakfast=4 unique, adult_dinner=4 unique, adult_lunch=6 unique, bulk_meal_prep=1 unique, infant_blw=6 unique, toddler_breakfast=4 unique, toddler_school_lunch=4 unique, toddler_weekend_lunch=2 unique
+INFO mealprepper.skills.week_outline: Adult dinners by day: mon:Sheet Pan Lemon Herb Chicken | tue:Beef & Broccoli Stir Fry | wed:Baked Salmon & Roasted Veg | thu:Mild Turkey Tacos | fri:Beef & Broccoli Stir Fry | sat:Beef & Broccoli Stir Fry | sun:Mild Turkey Tacos
+INFO mealprepper.skills.meal_finder: Expanding recipe 1/43: Turkey & Cheese Roll-ups (monday, toddler_school_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for toddler_school_lunch: Ground meat taco bowl casserole
+INFO mealprepper.skills.meal_finder: Expanding recipe 2/43: Banana Pancake Bites (monday, toddler_breakfast)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (13.2s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 3/43: Overnight Oats (monday, adult_breakfast)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (13.9s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 4/43: Mediterranean Grain Bowls (monday, adult_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_lunch: Chicken broccoli casserole
+INFO mealprepper.skills.meal_finder: Expanding recipe 5/43: Sheet Pan Lemon Herb Chicken (monday, adult_dinner)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_dinner: Quesadilla Sheet Bake
+INFO mealprepper.skills.meal_finder: Expanding recipe 6/43: Steamed Broccoli & Avocado Strips (monday, infant_blw)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for infant_blw: Broccoli Cheesy Bread
+WARNING mealprepper.skills.meal_finder: BLW check for Steamed Broccoli & Avocado Strips: Introduce cautiously if not yet offered: 1 large egg
+INFO mealprepper.skills.meal_finder: Expanding recipe 7/43: Hummus Veggie Pinwheels (tuesday, toddler_school_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for toddler_school_lunch: Quesadilla Sheet Bake
+INFO mealprepper.skills.meal_finder: Expanding recipe 8/43: Scrambled Eggs & Toast Strips (tuesday, toddler_breakfast)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for toddler_breakfast: Smash burger
+INFO mealprepper.skills.meal_finder: Expanding recipe 9/43: Veggie Scramble (tuesday, adult_breakfast)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_breakfast: Quesadilla Sheet Bake
+INFO mealprepper.skills.meal_finder: Reusing recipe 10/43: Sheet Pan Lemon Herb Chicken (tuesday, adult_lunch) from monday adult_dinner
+INFO mealprepper.skills.meal_finder: Expanding recipe 11/43: Beef & Broccoli Stir Fry (tuesday, adult_dinner)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_dinner: Chicken broccoli casserole
+INFO mealprepper.skills.meal_finder: Expanding recipe 12/43: Soft Banana Spears & Yogurt (tuesday, infant_blw)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for infant_blw: Baked Ssalmon Patties
+INFO mealprepper.skills.meal_finder: Expanding recipe 13/43: Cheese & Crackers Bento (wednesday, toddler_school_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for toddler_school_lunch: Chicken broccoli casserole
+INFO mealprepper.skills.meal_finder: Expanding recipe 14/43: Yogurt with Berries (wednesday, toddler_breakfast)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (13.3s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 15/43: Greek Yogurt Parfait (wednesday, adult_breakfast)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_breakfast: Baked Ssalmon Patties
+INFO mealprepper.skills.meal_finder: Reusing recipe 16/43: Beef & Broccoli Stir Fry (wednesday, adult_lunch) from tuesday adult_dinner
+INFO mealprepper.skills.meal_finder: Expanding recipe 17/43: Baked Salmon & Roasted Veg (wednesday, adult_dinner)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_dinner: Baked Ssalmon Patties
+INFO mealprepper.skills.meal_finder: Expanding recipe 18/43: Sweet Potato Wedges (wednesday, infant_blw)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for infant_blw: Sweet & Sour Chicken Bake
+INFO mealprepper.skills.meal_finder: Expanding recipe 19/43: Bean & Cheese Quesadilla Wedges (thursday, toddler_school_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for toddler_school_lunch: Quesadilla Sheet Bake
+INFO mealprepper.skills.meal_finder: Expanding recipe 20/43: Oatmeal with Banana (thursday, toddler_breakfast)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (14.0s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 21/43: Avocado Toast with Eggs (thursday, adult_breakfast)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (9.2s)
+INFO mealprepper.skills.meal_finder: Reusing recipe 22/43: Baked Salmon & Roasted Veg (thursday, adult_lunch) from wednesday adult_dinner
+INFO mealprepper.skills.meal_finder: Expanding recipe 23/43: Mild Turkey Tacos (thursday, adult_dinner)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (8.0s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 24/43: Soft Scrambled Egg Strips (thursday, infant_blw)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for infant_blw: Broccoli Cheesy Bread
+WARNING mealprepper.skills.meal_finder: BLW check for Soft Scrambled Egg Strips: Introduce cautiously if not yet offered: 1 large egg
+INFO mealprepper.skills.meal_finder: Expanding recipe 25/43: Turkey & Cheese Roll-ups (friday, toddler_school_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for toddler_school_lunch: Ground meat taco bowl casserole
+INFO mealprepper.skills.meal_finder: Expanding recipe 26/43: Banana Pancake Bites (friday, toddler_breakfast)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (12.3s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 27/43: Overnight Oats (friday, adult_breakfast)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (9.1s)
+INFO mealprepper.skills.meal_finder: Reusing recipe 28/43: Mild Turkey Tacos (friday, adult_lunch) from thursday adult_dinner
+INFO mealprepper.skills.meal_finder: Reusing recipe 29/43: Beef & Broccoli Stir Fry (friday, adult_dinner) from tuesday adult_dinner
+INFO mealprepper.skills.meal_finder: Expanding recipe 30/43: Steamed Green Bean Strips (friday, infant_blw)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for infant_blw: Sweet & Sour Chicken Bake
+INFO mealprepper.skills.meal_finder: Expanding recipe 31/43: Mac & Cheese with Peas (saturday, toddler_weekend_lunch)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (10.4s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 32/43: Scrambled Eggs & Toast Strips (saturday, toddler_breakfast)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for toddler_breakfast: Smash burger
+INFO mealprepper.skills.meal_finder: Expanding recipe 33/43: Veggie Scramble (saturday, adult_breakfast)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_breakfast: Quesadilla Sheet Bake
+INFO mealprepper.skills.meal_finder: Expanding recipe 34/43: Pasta Primavera (saturday, adult_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_lunch: Italian chicken casserole
+INFO mealprepper.skills.meal_finder: Reusing recipe 35/43: Beef & Broccoli Stir Fry (saturday, adult_dinner) from tuesday adult_dinner
+INFO mealprepper.skills.meal_finder: Expanding recipe 36/43: Soft Salmon Flake & Peas (saturday, infant_blw)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for infant_blw: Baked Ssalmon Patties
+INFO mealprepper.skills.meal_finder: Expanding recipe 37/43: Shredded Chicken for the Week (saturday, bulk_meal_prep)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (9.5s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 38/43: Grilled Cheese & Tomato Soup (sunday, toddler_weekend_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for toddler_weekend_lunch: Chicken stuffing bake
+INFO mealprepper.skills.meal_finder: Expanding recipe 39/43: Yogurt with Berries (sunday, toddler_breakfast)
+INFO mealprepper.llm.ollama_client: Ollama request: recipe_expand (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: recipe_expand (4.8s)
+INFO mealprepper.skills.meal_finder: Expanding recipe 40/43: Greek Yogurt Parfait (sunday, adult_breakfast)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_breakfast: Baked Ssalmon Patties
+INFO mealprepper.skills.meal_finder: Expanding recipe 41/43: Sheet Pan Lemon Herb Chicken (sunday, adult_lunch)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for adult_lunch: Quesadilla Sheet Bake
+INFO mealprepper.skills.meal_finder: Reusing recipe 42/43: Mild Turkey Tacos (sunday, adult_dinner) from thursday adult_dinner
+INFO mealprepper.skills.meal_finder: Expanding recipe 43/43: Steamed Broccoli & Avocado Strips (sunday, infant_blw)
+INFO mealprepper.skills.meal_finder: Using saved family recipe for infant_blw: Broccoli Cheesy Bread
+WARNING mealprepper.skills.meal_finder: BLW check for Steamed Broccoli & Avocado Strips: Introduce cautiously if not yet offered: 1 large egg
+INFO mealprepper.skills.week_organizer: Week organized: 43 planned meals
+INFO mealprepper.agents.base: [weekly_meals] running tool: validate_shelf_life
+WARNING mealprepper.agents.weekly_meals: Shelf life audit found 1 issues
+INFO mealprepper.agents.base: [weekly_meals] running tool: synergize_ingredients
+WARNING mealprepper.llm.ollama_client: Prompt size 6001 exceeds budget 6000 for CallType.WEEK_ORGANIZER — truncating user message
+INFO mealprepper.llm.ollama_client: Ollama request: week_organizer (model=qwen3:8b)
+INFO mealprepper.llm.ollama_client: Ollama complete: week_organizer (5.9s)
+INFO mealprepper.agents.base: [weekly_meals] running tool: save_plan
+INFO mealprepper.agents.base: [communications] running tool: format_playbook
+INFO mealprepper.agents.base: [communications] running tool: send_approval
+INFO mealprepper.skills.comms.slack: Slack webhook message sent

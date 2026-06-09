@@ -72,7 +72,7 @@ install_plist "plan-week" 10 0 6 '<string>plan-week</string>'
 # Sunday 08:00 — grocery list (weekday 0 = Sunday)
 install_plist "generate-grocery" 8 0 0 '<string>generate-grocery</string>'
 
-# Daily 07:00 — morning SMS (weekday omitted = every day; use separate daily plist)
+# Daily 07:00 — morning notification (weekday omitted = every day; use separate daily plist)
 DAILY_PLIST="$PLIST_DIR/com.mealprepper.send-daily.plist"
 cat > "$DAILY_PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>

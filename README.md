@@ -1,6 +1,6 @@
 # MealPrepper
 
-Family meal planning with local Ollama agents. Plans weekly meals for toddler, infant (BLW), and adults; builds grocery lists; sends SMS summaries.
+Family meal planning with local Ollama agents. Plans weekly meals for toddler, infant (BLW), and adults; builds grocery lists; sends plan summaries via Slack, Discord, Telegram, or iMessage.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ cp .env.example .env          # optional — defaults work for dev
 pip install -e ".[dev]"
 
 # Pull model (if not already)
-ollama pull llama3.2
+ollama pull qwen3:8b
 
 # Initialize database
 mealprepper init-db
@@ -72,22 +72,160 @@ mealprepper show-synergy             # full cook-efficiency report
 
 Tune in `config/default.yaml` under `planning.cook_efficiency` (`max_dinner_cook_sessions`, `cross_block_reuse`, etc.).
 
+### Food shelf life (`config/food_shelf_life.yaml`)
+
+During planning, MealPrepper checks how long cooked food realistically keeps in the fridge before reuse:
+
+- **Seafood** (~2 days) — won't schedule Monday salmon as Friday leftovers
+- **Poultry** (~3 days), **red meat** (~4 days), **vegetarian/grain** (~5 days)
+
+Verify leftover timing:
+
+```bash
+mealprepper show-shelf-life
+mealprepper show-synergy              # includes shelf-life section
+```
+
+Edit category keywords and `fridge_days` in `config/food_shelf_life.yaml` to match your comfort level.
+
+### Family recipe library
+
+Build a searchable library of recipes and meal ideas your family already likes. MealPrepper uses this during `plan-week` for inspiration and can reuse full saved recipes instead of generating from scratch.
+
+**Import one-off** (writes directly to the SQLite recipe library — used automatically during `plan-week`):
+
+```bash
+mealprepper import-recipe --text "Mild turkey tacos — kids love with avocado"
+mealprepper import-recipe --title "Beef Stir Fry" --file ../ai-data/mealprepper/recipes/my-recipe.md
+mealprepper import-recipe --url "https://example.com/recipe-page"
+```
+
+Some recipe sites (Allrecipes, etc.) block automated downloads with HTTP 403. For those, copy the recipe into a file or use `--text` / `--file` instead.
+
+**Bulk import from config** (also writes to the same DB — run when you add or change sources, not every plan):
+
+Edit `config/recipe_sources.yaml`, then:
+
+```bash
+mealprepper sync-recipes
+mealprepper list-recipes
+mealprepper list-recipes -q chicken
+```
+
+There is no separate “planning sync” step. Once a recipe is in the DB, `plan-week` searches it via the recipe index. `sync-recipes` is just a batch version of `import-recipe` driven by YAML.
+
+**Trello workflow:** Export your board as JSON, then convert it into structured sources (markdown files, URLs, and text ideas):
+
+```bash
+python scripts/trello_to_recipe_sources.py ../ai-data/mealprepper/trello-export.json
+mealprepper sync-recipes
+```
+
+The script classifies each card: full steps in the description → markdown file; attachment URL → `url` source; name-only → `text` idea. Avoid `--trello-export` for large boards — it dumps every card through the LLM parser and is slow.
+
+Card **names** become titles; **descriptions** become recipe text/notes.
+
+Markdown files support optional front matter:
+
+```markdown
+# Recipe Title
+blocks: adult_dinner
+tags: family-favorite
+
+## Ingredients
+- chicken — 2 lb
+
+## Steps
+1. Cook and serve.
+```
+
+During planning, saved recipes appear in the meal-finder prompt as "Family recipe library". Exact title matches use your saved full recipe (with steps) automatically.
+
+## Notifications
+
+MealPrepper sends **weekly plan approvals** and **daily meal summaries** through a pluggable comms backend — no SMS or paid Twilio required.
+
+Set `COMMS_BACKEND` in `.env` (legacy alias: `SMS_BACKEND`):
+
+| Backend | Best for | Setup |
+|---------|----------|-------|
+| `console` | Dev / VM testing | Default — prints to terminal |
+| `slack` | Daily Slack users (recommended) | Incoming webhook URL |
+| `discord` | Discord households | Channel webhook URL |
+| `telegram` | Phone push via BotFather | Bot token + chat id |
+| `imessage` | macOS with Shortcuts relay | Apple Shortcuts webhook → Messages |
+
+### Slack setup (recommended)
+
+**Full guide:** [docs/SLACK_BOT.md](docs/SLACK_BOT.md)
+
+1. Create a Slack app → enable **Socket Mode** + **Incoming Webhooks**.
+2. Add bot scopes: `chat:write`, `channels:history`, `groups:history`, `app_mentions:read`, `commands`.
+3. Subscribe to bot events: `message.channels`, `app_mention`.
+4. Create slash command `/mealprepper`.
+5. Install to workspace; invite `@MealPrepper` to `#food`.
+
+```bash
+COMMS_BACKEND=slack
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...   # outbound
+SLACK_BOT_TOKEN=xoxb-...                                  # inbound bot
+SLACK_APP_TOKEN=xapp-...                                  # Socket Mode
+SLACK_CHANNEL_ID=C0123456789                              # your channel
+
+pip install -e ".[slack]"
+
+# Run the inbound bot as a background service (no terminal needed):
+./scripts/install_systemd.sh
+systemctl --user enable --now mealprepper-watch-messages.service
+
+# Or run in the foreground for debugging only:
+mealprepper watch-messages
+```
+
+**Bot commands:** `approve`, `reject`, `status`, `plan`, `daily`, `grocery`, `help`, `loved tacos` — or `/mealprepper approve`.
+
+### Slack / Discord / Telegram / iMessage
+
+```bash
+# Slack
+COMMS_BACKEND=slack
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T.../B.../...
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_APP_TOKEN=xapp-...
+SLACK_CHANNEL_ID=C0123456789
+
+# Discord
+COMMS_BACKEND=discord
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+
+# Telegram (when you're ready — create bot via @BotFather)
+COMMS_BACKEND=telegram
+TELEGRAM_BOT_TOKEN=123456:ABC...
+TELEGRAM_CHAT_ID=your_chat_id
+
+# macOS iMessage via Shortcuts
+COMMS_BACKEND=imessage
+APPLE_SHORTCUTS_WEBHOOK_URL=https://...
+```
+
 ## Weekly Workflow
 
 | Day | Time | Command | What happens |
 |-----|------|---------|--------------|
-| Saturday | 10:00 | `mealprepper plan-week` | Weekly Meals Agent builds plan, sends approval SMS |
-| — | — | `mealprepper process-feedback -m APPROVE` | Approve plan (or reply via SMS in production) |
+| Saturday | 10:00 | `mealprepper plan-week` | Weekly Meals Agent builds plan, posts approval to Slack/etc. |
+| — | — | `approve` in Slack (or `mealprepper process-feedback -m APPROVE`) | Approve pending plan |
 | Sunday | 08:00 | `mealprepper generate-grocery` | Grocery Agent builds shopping list |
-| Daily | 07:00 | `mealprepper send-daily` | Morning SMS with today's meals |
+| Daily | 07:00 | `mealprepper send-daily` | Morning notification with today's meals |
 
 ### First plan-week
 
 ```bash
 mealprepper init-db
-mealprepper plan-week --auto-approve   # skip SMS approval for first run
+mealprepper plan-week --auto-approve   # skip approval notification for first run
 mealprepper show-plan --markdown
 mealprepper show-plan --titles-only   # quick scan: meal names only
+mealprepper show-plan --recipes       # full step-by-step recipes
+mealprepper show-shelf-life           # leftover timing check
 mealprepper generate-grocery
 mealprepper show-grocery --markdown
 ```
@@ -108,12 +246,17 @@ mealprepper approve-plan
 | `plan-week [--week-start YYYY-MM-DD] [--auto-approve]` | Generate weekly meal plan |
 | `approve-plan [--plan-id ID]` | Manually approve pending plan |
 | `generate-grocery [--plan-id ID]` | Build grocery list from approved plan |
+| `import-recipe [--text\|--url\|--file\|--trello-export]` | Add a family recipe or meal idea to the library |
+| `sync-recipes` | Import all sources from `config/recipe_sources.yaml` |
+| `purge-recipes --duplicates` | Remove duplicate saved recipes (keeps best copy per title) |
+| `list-recipes [--query Q]` | Browse/search saved family recipes |
 | `show-grocery [--plan-id ID] [--markdown]` | Display latest grocery list (recipe items, weekly staples, pantry assumed) |
-| `send-daily [--date YYYY-MM-DD]` | Send morning meal summary SMS |
-| `process-feedback [-m MESSAGE]` | Apply pending feedback or parse inbound SMS |
-| `show-plan [--plan-id ID] [--markdown] [--titles-only] [--synergy]` | Display plan, meal names only, or include synergy report |
-| `show-synergy [--plan-id ID] [--markdown]` | Cook reuse links, shared ingredients, synergy notes |
-| `watch-messages` | Stub for inbound SMS webhook |
+| `send-daily [--date YYYY-MM-DD]` | Send morning meal summary notification |
+| `process-feedback [-m MESSAGE]` | Apply pending feedback or parse inbound message |
+| `show-plan [--plan-id ID] [--markdown] [--titles-only] [--recipes] [--synergy]` | Display plan, titles, full recipes, or synergy report |
+| `show-synergy [--plan-id ID] [--markdown]` | Cook reuse, shared ingredients, shelf life, synergy notes |
+| `show-shelf-life [--plan-id ID]` | Leftover timing rules and food-safety reuse issues |
+| `watch-messages` | Run Slack bot listener (Socket Mode; requires `[slack]` extra) |
 
 Also: `python -m mealprepper <command>`
 
@@ -124,13 +267,18 @@ Also: `python -m mealprepper <command>`
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
 | `OLLAMA_MODEL` | `llama3.2` | Model name — use a **fast** model for `plan-week` (40+ LLM calls) |
 | `MEALPREPPER_DATA_DIR` | `./data` | SQLite + output files |
-| `SMS_BACKEND` | `console` | `console` (dev), `twilio` (Linux/production), `apple_shortcuts` (macOS webhook), `imsg` (macOS stub) |
-| `APPROVAL_REQUIRED` | `true` | Send approval SMS after planning |
+| `COMMS_BACKEND` | `console` | `console`, `slack`, `discord`, `telegram`, `imessage` (alias: `SMS_BACKEND`) |
+| `SLACK_WEBHOOK_URL` | — | Slack incoming webhook (outbound notifications) |
+| `SLACK_BOT_TOKEN` | — | Bot User OAuth Token (`xoxb-...`) for inbound |
+| `SLACK_APP_TOKEN` | — | App-Level Token (`xapp-...`, scope `connections:write`) |
+| `SLACK_CHANNEL_ID` | — | Restrict bot to one channel (recommended) |
+| `DISCORD_WEBHOOK_URL` | — | Discord channel webhook |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | — | Telegram BotFather bot |
+| `APPLE_SHORTCUTS_WEBHOOK_URL` | — | macOS Shortcuts → iMessage relay |
+| `APPROVAL_REQUIRED` | `true` | Send approval notification after planning |
 | `DAILY_REMINDER_HOUR` | `7` | Used by systemd/cron/launchd scheduling |
 
-Twilio vars: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `TWILIO_TO_NUMBER`
-
-On Linux servers, use `SMS_BACKEND=twilio` for real SMS. `apple_shortcuts` and `imsg` are macOS-only integrations.
+On your Linux VM, use `COMMS_BACKEND=slack` with a webhook URL — free, no phone carrier needed. iMessage requires a Mac running Shortcuts as a relay.
 
 ## Scheduling
 
@@ -142,9 +290,19 @@ Weekly jobs run automatically once installed. Pick the method for your OS:
 ./scripts/install_systemd.sh
 ```
 
-Installs user systemd timers for Saturday plan (10:00), Sunday grocery (08:00), and daily SMS (07:00). Logs go to `data/logs/`.
+Installs user systemd timers for Saturday plan (10:00), Sunday grocery (08:00), and daily notifications (07:00). Also writes `mealprepper-watch-messages.service` for the always-on Slack bot. Logs go to `data/logs/`.
 
-If timers should run while you are logged out:
+Enable the Slack bot listener (runs in background, restarts on failure):
+
+```bash
+systemctl --user enable --now mealprepper-watch-messages.service
+systemctl --user status mealprepper-watch-messages.service
+tail -f data/logs/watch-messages.log
+```
+
+Stop the foreground `mealprepper watch-messages` if you started one manually — only one listener should run.
+
+If timers and the bot should run while you are logged out:
 
 ```bash
 sudo loginctl enable-linger $USER
@@ -194,7 +352,7 @@ MealPrepper keeps LLM prompts small by **retrieving** only relevant history inst
 2. **Top-k retrieval** — `MealFinderSkill` pulls recent/similar meals and block-specific feedback via `MealIndex` and `PreferenceIndex`; `PlanIndex` adds compact past-week summaries.
 3. **PromptBuilder + ContextBudget** — Sections are assembled by priority; lower-priority chunks are trimmed or dropped when over budget.
 4. **Compression** — `ContextCompressor` caps list lengths and merges feedback into rolling `preference_summaries` stored in SQLite.
-5. **Today-only slices** — Communications and daily SMS use `WeeklyPlan.meals_for_day()` so only the target day's meals are formatted, not the full week.
+5. **Today-only slices** — Communications and daily notifications use `WeeklyPlan.meals_for_day()` so only the target day's meals are formatted, not the full week.
 
 ### Config knobs (`config/default.yaml`)
 
@@ -222,7 +380,7 @@ context:
   budgets:
     meal_finder: 5000          # week outline generation
     recipe_expand: 2500        # single recipe expansion
-    comms: 2000                # SMS formatting
+    comms: 2000                # notification formatting
   warn_at_pct: 0.80            # log when prompt reaches 80% of budget
 
 index:
@@ -241,7 +399,7 @@ Environment overrides: `MAX_CONTEXT_CHARS`, `OLLAMA_EMBEDDING_MODEL` (default `n
 | Meal finder preferences | Full liked/disliked lists + all notes | ~15 items + 500-char summary (~400–600 tokens) |
 | Meal finder history | N/A (no retrieval) | Top 5 indexed meals (~200 tokens) |
 | Recipe expand | Full outline only | Outline + 2 similar past recipes (~300 tokens) |
-| Daily SMS | Already day-scoped | Unchanged — uses `DailyPlanSummary` slice only |
+| Daily notifications | Already day-scoped | Unchanged — uses `DailyPlanSummary` slice only |
 | Preference learning | Raw comment append | Batch summary stored in `preference_summaries` |
 
 For a family with 50+ feedback entries and multiple past plans, meal-finder prompts typically shrink from **8k–15k chars to ~3k–5k chars** (~60% reduction).

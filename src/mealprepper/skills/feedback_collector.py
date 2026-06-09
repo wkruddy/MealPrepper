@@ -8,7 +8,7 @@ from mealprepper.models.plans import WeeklyPlan
 
 
 class FeedbackCollectorSkill:
-    """Parse inbound SMS-style feedback into structured MealFeedback records."""
+    """Parse inbound chat-style feedback into structured MealFeedback records."""
 
     RATING_PATTERNS: dict[FeedbackRating, re.Pattern[str]] = {
         FeedbackRating.LOVED: re.compile(r"\bloved\b", re.I),

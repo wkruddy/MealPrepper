@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,11 +28,18 @@ class Settings(BaseSettings):
     mealprepper_data_dir: Path = Field(default=Path("./data"), alias="MEALPREPPER_DATA_DIR")
     default_timezone: str = Field(default="America/New_York", alias="DEFAULT_TIMEZONE")
 
-    sms_backend: str = Field(default="console", alias="SMS_BACKEND")
-    twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
-    twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
-    twilio_from_number: str = Field(default="", alias="TWILIO_FROM_NUMBER")
-    twilio_to_number: str = Field(default="", alias="TWILIO_TO_NUMBER")
+    comms_backend: str = Field(
+        default="console",
+        validation_alias=AliasChoices("COMMS_BACKEND", "SMS_BACKEND"),
+    )
+    slack_webhook_url: str = Field(default="", alias="SLACK_WEBHOOK_URL")
+    slack_bot_token: str = Field(default="", alias="SLACK_BOT_TOKEN")
+    slack_app_token: str = Field(default="", alias="SLACK_APP_TOKEN")
+    slack_channel_id: str = Field(default="", alias="SLACK_CHANNEL_ID")
+    discord_webhook_url: str = Field(default="", alias="DISCORD_WEBHOOK_URL")
+    discord_bot_token: str = Field(default="", alias="DISCORD_BOT_TOKEN")
+    telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
+    telegram_chat_id: str = Field(default="", alias="TELEGRAM_CHAT_ID")
     apple_shortcuts_webhook_url: str = Field(default="", alias="APPLE_SHORTCUTS_WEBHOOK_URL")
 
     approval_required: bool = Field(default=True, alias="APPROVAL_REQUIRED")

@@ -8,6 +8,7 @@ from mealprepper.config import get_settings
 from mealprepper.context.budget import load_context_budget
 from mealprepper.models.family import FamilyProfile
 from mealprepper.models.plans import PlanStatus, WeeklyPlan
+from mealprepper.skills.food_shelf_life import FoodShelfLifeSkill
 from mealprepper.skills.ingredient_synergy import IngredientSynergySkill
 from mealprepper.skills.meal_finder import MealFinderSkill
 from mealprepper.skills.week_organizer import WeekOrganizerSkill
@@ -22,6 +23,8 @@ Your responsibilities:
 - Find age-appropriate meals for toddler, infant (BLW), and adults
 - Organize the week covering all meal blocks (school/weekend lunches, breakfasts, dinners, BLW, bulk prep)
 - Synergize ingredients to minimize waste and overlap with the Grocery List Agent
+- Validate leftover timing so seafood and other short-life foods are not reused too late
+- Ensure toddler meals cover carb, protein, veggie, fruit, fat (via FoodGroupsSkill)
 - Track preferences and feedback from past weeks
 
 Constraints:
@@ -30,7 +33,7 @@ Constraints:
 - Adults: variable breakfast, bulk-preppable lunches, shared quick dinners
 - Family are competent cooks; prefer practical real meals
 
-Available tools: find_meals, organize_week, synergize_ingredients, load_preferences, save_plan"""
+Available tools: find_meals, organize_week, validate_shelf_life, synergize_ingredients, load_preferences, save_plan"""
 
 
 class WeeklyMealsAgent(BaseAgent):
@@ -43,6 +46,7 @@ class WeeklyMealsAgent(BaseAgent):
         meal_finder: MealFinderSkill | None = None,
         week_organizer: WeekOrganizerSkill | None = None,
         synergy: IngredientSynergySkill | None = None,
+        shelf_life: FoodShelfLifeSkill | None = None,
         **kwargs,
     ) -> None:
         self.settings = get_settings()
@@ -54,12 +58,18 @@ class WeeklyMealsAgent(BaseAgent):
         )
         self.week_organizer = week_organizer or WeekOrganizerSkill(self.meal_finder)
         self.synergy = synergy or IngredientSynergySkill()
+        self.shelf_life = shelf_life or FoodShelfLifeSkill()
         self.family = FamilyProfile.from_config(self.settings.merged_config())
         super().__init__(llm=self.meal_finder.llm, **kwargs)
 
     def _register_tools(self) -> None:
         self.register_tool("find_meals", "Find meal candidates for a week", self._find_meals)
         self.register_tool("organize_week", "Build structured weekly plan", self._organize_week)
+        self.register_tool(
+            "validate_shelf_life",
+            "Check leftover timing for cooked meals",
+            self._validate_shelf_life,
+        )
         self.register_tool(
             "synergize_ingredients", "Optimize ingredient overlap", self._synergize
         )
@@ -70,6 +80,7 @@ class WeeklyMealsAgent(BaseAgent):
         """Main orchestration loop for weekly planning."""
         prefs = self.run_tool("load_preferences")
         plan: WeeklyPlan = self.run_tool("organize_week", week_start=week_start, preferences=prefs)
+        plan = self.run_tool("validate_shelf_life", plan=plan)
         plan = self.run_tool("synergize_ingredients", plan=plan)
         plan.status = PlanStatus.PENDING_APPROVAL
         plan = self.run_tool("save_plan", plan=plan)
@@ -87,6 +98,14 @@ class WeeklyMealsAgent(BaseAgent):
     def _organize_week(self, week_start: date | None = None, preferences=None, **_) -> WeeklyPlan:
         prefs = preferences or self.store.get_compact_preferences()
         return self.week_organizer.organize_week(self.family, prefs, week_start)
+
+    def _validate_shelf_life(self, plan: WeeklyPlan, **_) -> WeeklyPlan:
+        audit = self.shelf_life.audit_plan(plan)
+        if audit.warnings:
+            logger.warning("Shelf life audit found %d issues", len(audit.warnings))
+            existing = list(plan.synergy_suggestions)
+            plan.synergy_suggestions = audit.warnings + existing
+        return plan
 
     def _synergize(self, plan: WeeklyPlan, **_) -> WeeklyPlan:
         report = self.synergy.analyze(plan)

@@ -1,15 +1,7 @@
-from __future__ import annotations
+"""Backward-compatible re-exports — prefer mealprepper.skills.comms.console."""
 
-from mealprepper.skills.sms.base import SMSBackend
+from mealprepper.skills.comms.console import ConsoleCommsBackend
 
+ConsoleSMSBackend = ConsoleCommsBackend
 
-class ConsoleSMSBackend(SMSBackend):
-    """Development backend — prints messages to stdout."""
-
-    def send(self, to: str, body: str) -> bool:
-        print("\n" + "=" * 60)
-        print(f"SMS (console mock) → {to or 'family'}")
-        print("-" * 60)
-        print(body)
-        print("=" * 60 + "\n")
-        return True
+__all__ = ["ConsoleCommsBackend", "ConsoleSMSBackend"]

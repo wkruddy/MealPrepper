@@ -5,6 +5,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from mealprepper.config import Settings, get_settings
+from mealprepper.skills.food_shelf_life import FoodShelfLifeSkill
 from mealprepper.models.plans import WeeklyPlan
 from mealprepper.skills.meal_blocks import DAYS, WeekMealOutline
 from mealprepper.skills.week_outline import outline_sort_key
@@ -60,8 +61,13 @@ class CookEfficiencySkill:
 
     LEFTOVER_LUNCH_BLOCKS = {"adult_lunch"}
 
-    def __init__(self, config: CookEfficiencyConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: CookEfficiencyConfig | None = None,
+        shelf_life: FoodShelfLifeSkill | None = None,
+    ) -> None:
         self.config = config or CookEfficiencyConfig.from_settings()
+        self.shelf_life = shelf_life or FoodShelfLifeSkill()
 
     def apply_to_outlines(self, outlines: list[WeekMealOutline]) -> list[WeekMealOutline]:
         if not self.config.enabled:
@@ -212,7 +218,14 @@ class CookEfficiencySkill:
         for index, dinner in enumerate(dinners):
             if index < self.config.max_dinner_cook_sessions:
                 continue
-            template = templates[index % len(templates)]
+            template = self._pick_shelf_safe_template(dinner, templates)
+            if template is None:
+                logger.info(
+                    "Shelf life: no safe dinner reuse for %s (%s) — keeping fresh cook",
+                    dinner.day,
+                    dinner.title,
+                )
+                continue
             key = (dinner.day, "adult_dinner")
             outlines[key] = WeekMealOutline(
                 day=dinner.day,
@@ -231,6 +244,21 @@ class CookEfficiencySkill:
                 template.title,
             )
         return outlines
+
+    def _pick_shelf_safe_template(
+        self,
+        dinner: WeekMealOutline,
+        templates: list[WeekMealOutline],
+    ) -> WeekMealOutline | None:
+        for template in templates:
+            if self.shelf_life.reuse_is_valid(
+                template.title,
+                template.day,
+                dinner.day,
+                template.key_ingredients,
+            ):
+                return template
+        return None
 
     def _links_from_outlines(self, outlines: list[WeekMealOutline]) -> list[ReuseLink]:
         links: list[ReuseLink] = []

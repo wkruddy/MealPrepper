@@ -1,0 +1,133 @@
+# Food group coverage for toddler and adult meals.
+# Used to classify ingredients and note balanced plates.
+
+required_groups:
+  - carb
+  - protein
+  - veggie
+  - fruit
+  - fat
+
+# toddler_* blocks require all groups (or suggest sides).
+# adult_* blocks get notes but are not enforced.
+# infant_blw and bulk_meal_prep are skipped.
+
+groups:
+  carb:
+    - bread
+    - roll
+    - bun
+    - tortilla
+    - wrap
+    - pita
+    - rice
+    - pasta
+    - noodle
+    - orzo
+    - couscous
+    - quinoa
+    - oat
+    - oatmeal
+    - cereal
+    - cracker
+    - potato
+    - sweet potato
+    - corn
+    - muffin
+    - pancake
+    - waffle
+    - bagel
+    - english muffin
+  protein:
+    - chicken
+    - turkey
+    - beef
+    - steak
+    - pork
+    - ham
+    - bacon
+    - sausage
+    - fish
+    - salmon
+    - tuna
+    - tilapia
+    - shrimp
+    - egg
+    - tofu
+    - bean
+    - lentil
+    - chickpea
+    - yogurt
+    - cottage cheese
+    - cheese
+    - nut butter
+    - peanut butter
+    - hummus
+  veggie:
+    - broccoli
+    - carrot
+    - cucumber
+    - pepper
+    - bell pepper
+    - spinach
+    - kale
+    - lettuce
+    - salad
+    - tomato
+    - zucchini
+    - squash
+    - cauliflower
+    - green bean
+    - pea
+    - corn
+    - celery
+    - onion
+    - cabbage
+    - slaw
+    - asparagus
+    - mushroom
+    - eggplant
+  fruit:
+    - apple
+    - banana
+    - berry
+    - berries
+    - strawberry
+    - blueberry
+    - grape
+    - orange
+    - mandarin
+    - clementine
+    - pear
+    - peach
+    - mango
+    - pineapple
+    - melon
+    - watermelon
+    - raisin
+    - dried fruit
+  fat:
+    - butter
+    - olive oil
+    - oil
+    - avocado
+    - mayo
+    - mayonnaise
+    - cream cheese
+    - sour cream
+    - nuts
+    - almond
+    - walnut
+    - pecan
+    - seeds
+    - chia
+    - flax
+    - tahini
+    - dressing
+
+fallback_additions:
+  carb: whole wheat crackers
+  protein: cheese stick or yogurt
+  veggie: cucumber or carrot sticks
+  fruit: apple slices or banana
+  fat: avocado slices or cheese cubes
