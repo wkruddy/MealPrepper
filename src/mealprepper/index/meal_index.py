@@ -8,6 +8,7 @@ from pathlib import Path
 from mealprepper.config import Settings, get_settings
 from mealprepper.models.meals import PlannedMeal
 from mealprepper.models.plans import WeeklyPlan
+from mealprepper.storage.migrations import DEFAULT_FAMILY_ID
 from mealprepper.storage.sqlite import ensure_db_schema
 
 logger = logging.getLogger(__name__)
@@ -28,9 +29,15 @@ class IndexedMeal:
 class MealIndex:
     """SQLite FTS5 index for saved meals — retrieve top-k for meal_block queries."""
 
-    def __init__(self, db_path: Path | None = None, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        db_path: Path | None = None,
+        settings: Settings | None = None,
+        family_id: str = DEFAULT_FAMILY_ID,
+    ) -> None:
         self.settings = settings or get_settings()
         self.db_path = db_path or self.settings.database_path
+        self.family_id = family_id
         ensure_db_schema(self.db_path, self.settings)
 
     def _connect(self) -> sqlite3.Connection:
@@ -55,11 +62,12 @@ class MealIndex:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO meal_index
-                (meal_id, title, meal_block, day, ingredients, tags, plan_id, body)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (meal_id, family_id, title, meal_block, day, ingredients, tags, plan_id, body)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     meal_id,
+                    self.family_id,
                     meal.recipe.title,
                     meal.meal_block,
                     meal.day,
@@ -97,10 +105,10 @@ class MealIndex:
             return self.recent(top_k=top_k, meal_block=meal_block)
 
         fts_query = self._fts_query(query)
-        block_filter = ""
-        params: list = [fts_query]
+        block_filter = " AND m.family_id = ?"
+        params: list = [fts_query, self.family_id]
         if meal_block:
-            block_filter = " AND m.meal_block = ?"
+            block_filter += " AND m.meal_block = ?"
             params.append(meal_block)
         params.append(top_k)
 
@@ -124,10 +132,14 @@ class MealIndex:
         return [self._row_to_meal(r) for r in rows]
 
     def recent(self, *, top_k: int = 5, meal_block: str | None = None) -> list[IndexedMeal]:
-        sql = "SELECT meal_id, title, meal_block, day, ingredients, tags, plan_id, 0 AS score FROM meal_index"
-        params: list = []
+        sql = """
+            SELECT meal_id, title, meal_block, day, ingredients, tags, plan_id, 0 AS score
+            FROM meal_index
+            WHERE family_id = ?
+        """
+        params: list = [self.family_id]
         if meal_block:
-            sql += " WHERE meal_block = ?"
+            sql += " AND meal_block = ?"
             params.append(meal_block)
         sql += " ORDER BY rowid DESC LIMIT ?"
         params.append(top_k)
@@ -169,9 +181,9 @@ class MealIndex:
         sql = """
             SELECT meal_id, title, meal_block, day, ingredients, tags, plan_id, 0 AS score
             FROM meal_index
-            WHERE (title LIKE ? OR ingredients LIKE ? OR body LIKE ?)
+            WHERE family_id = ? AND (title LIKE ? OR ingredients LIKE ? OR body LIKE ?)
         """
-        params: list = [pattern, pattern, pattern]
+        params: list = [self.family_id, pattern, pattern, pattern]
         if meal_block:
             sql += " AND meal_block = ?"
             params.append(meal_block)

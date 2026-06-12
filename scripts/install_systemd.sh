@@ -104,6 +104,42 @@ EOF
 
 install_watch_service
 
+install_oauth_service() {
+  local service="$UNIT_DIR/mealprepper-oauth-server.service"
+  local python="${ROOT}/.venv/bin/python"
+  if [[ ! -x "$python" ]]; then
+    python="$(command -v python3)"
+  fi
+
+  cat > "$service" <<EOF
+[Unit]
+Description=MealPrepper Slack OAuth callback server (on-demand install)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=${ROOT}
+EnvironmentFile=-${ROOT}/.env
+ExecStart=${python} -m mealprepper slack oauth-server --host 0.0.0.0 --port 8787
+Restart=no
+StandardOutput=append:${ROOT}/data/logs/oauth-server.log
+StandardError=append:${ROOT}/data/logs/oauth-server.err
+
+[Install]
+WantedBy=default.target
+EOF
+
+  systemctl --user daemon-reload
+  echo ""
+  echo "OAuth callback service written (disabled by default — start only during workspace install):"
+  echo "  systemctl --user start mealprepper-oauth-server.service"
+  echo "  systemctl --user stop mealprepper-oauth-server.service"
+  echo "  tail -f ${ROOT}/data/logs/oauth-server.log"
+}
+
+install_oauth_service
+
 echo ""
 echo "Done. Logs: $ROOT/data/logs/"
 echo ""

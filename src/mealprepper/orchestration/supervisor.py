@@ -9,6 +9,7 @@ from mealprepper.agents.weekly_meals import WeeklyMealsAgent
 from mealprepper.config import get_settings
 from mealprepper.models.plans import PlanStatus, WeeklyPlan
 from mealprepper.orchestration.state import WorkflowPhase, WorkflowState
+from mealprepper.services.family_resolver import FamilyContext, FamilyResolver
 from mealprepper.storage.sqlite import SQLiteStore
 
 logger = logging.getLogger(__name__)
@@ -20,15 +21,33 @@ class MealPrepperSupervisor:
     def __init__(
         self,
         store: SQLiteStore | None = None,
+        family_context: FamilyContext | None = None,
         weekly_agent: WeeklyMealsAgent | None = None,
         grocery_agent: GroceryListAgent | None = None,
         comms_agent: CommunicationsAgent | None = None,
     ) -> None:
-        self.store = store or SQLiteStore()
-        self.weekly = weekly_agent or WeeklyMealsAgent(store=self.store)
-        self.grocery = grocery_agent or GroceryListAgent(store=self.store)
-        self.comms = comms_agent or CommunicationsAgent(store=self.store)
         self.settings = get_settings()
+        self.store = store or SQLiteStore(settings=self.settings)
+        resolver = FamilyResolver(db_path=self.store.db_path, settings=self.settings)
+        self.family_context = family_context or resolver.for_family_id(self.store.family_id)
+        if self.store.family_id != self.family_context.family_id:
+            self.store = SQLiteStore(
+                db_path=self.store.db_path,
+                settings=self.settings,
+                family_id=self.family_context.family_id,
+            )
+        self.weekly = weekly_agent or WeeklyMealsAgent(
+            store=self.store,
+            family_context=self.family_context,
+        )
+        self.grocery = grocery_agent or GroceryListAgent(
+            store=self.store,
+            family_context=self.family_context,
+        )
+        self.comms = comms_agent or CommunicationsAgent(
+            store=self.store,
+            family_context=self.family_context,
+        )
         self.state = WorkflowState()
 
     def plan_week(self, week_start: date | None = None, auto_approve: bool = False) -> WorkflowState:

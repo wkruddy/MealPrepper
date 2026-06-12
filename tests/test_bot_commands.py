@@ -1,5 +1,5 @@
 from datetime import date
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from mealprepper.models.meals import Ingredient, MealRecipe, PlannedMeal, RecipeStep
 from mealprepper.models.plans import PlanStatus, WeeklyPlan
@@ -85,7 +85,9 @@ def test_daily_returns_meals_not_send_meta():
     )
     supervisor.store.get_plan_for_date.return_value = plan
     handler = MealPrepperBotHandler(supervisor=supervisor, recipe_repo=MagicMock())
-    reply = handler.handle("daily")
+    with patch("mealprepper.skills.comms.bot_commands.date") as mock_date:
+        mock_date.today.return_value = date(2026, 6, 9)
+        reply = handler.handle("daily")
     assert reply.success
     assert reply.payloads
     assert "Tacos" in str(reply.payloads)
@@ -323,3 +325,187 @@ def test_recipe_shows_saved_steps():
     assert reply.success
     assert reply.blocks
     assert "Smash on griddle" in str(reply.blocks)
+
+
+def test_settings_command():
+    from unittest.mock import patch
+    from mealprepper.services.family_settings import FamilySettingsService, SettingsSummary
+    from mealprepper.models.settings import MacroTrackingConfig
+
+    summary = SettingsSummary(
+        family_id="default",
+        timezone="America/New_York",
+        members=[{"id": "a1", "name": "Alex", "role": "adult", "constraints": {"keto": True}}],
+        dietary_household=["gluten_free"],
+        cuisine_preferences=["mediterranean"],
+        staple_patterns=[],
+        schedule={"weekly_plan_day": "saturday"},
+        meal_blocks=["adult_dinner"],
+        pantry_on_hand_count=12,
+        pantry_staples_count=5,
+        macro_tracking=MacroTrackingConfig(enabled=False),
+    )
+    settings_service = MagicMock(spec=FamilySettingsService)
+    supervisor = MagicMock()
+    supervisor.family_context = MagicMock(family_id="default")
+    supervisor.store = MagicMock(family_id="default")
+    settings_service.for_slack_workspace.return_value = supervisor.family_context
+    settings_service.get_summary.return_value = summary
+    settings_service.format_slack_summary.return_value = "Timezone: America/New_York"
+
+    handler = MealPrepperBotHandler(
+        supervisor=supervisor,
+        recipe_repo=MagicMock(),
+        settings_service=settings_service,
+    )
+    reply = handler.handle("settings", channel="C123", workspace_id="T_DEV")
+    assert reply.success
+    assert reply.blocks
+    settings_service.get_summary.assert_called_once_with("default")
+
+
+def test_unknown_workspace_rejected():
+    from mealprepper.services.family_settings import FamilySettingsService
+
+    settings_service = MagicMock(spec=FamilySettingsService)
+    settings_service.for_slack_workspace.side_effect = ValueError("Slack workspace not registered")
+
+    handler = MealPrepperBotHandler(
+        supervisor=MagicMock(),
+        recipe_repo=MagicMock(),
+        settings_service=settings_service,
+    )
+    reply = handler.handle("status", channel="C1", workspace_id="T_UNKNOWN")
+    assert not reply.success
+    assert "isn't connected" in reply.text.lower()
+
+
+def test_pending_workspace_onboarding_prompt():
+    from mealprepper.services.family_resolver import SlackBinding, WorkspacePendingOnboarding
+    from mealprepper.services.family_settings import FamilySettingsService
+
+    settings_service = MagicMock(spec=FamilySettingsService)
+    settings_service.for_slack_workspace.side_effect = WorkspacePendingOnboarding(
+        SlackBinding(
+            id="b1",
+            family_id="",
+            workspace_id="T_FRACTAL",
+            channel_id="C_HEALTHY",
+            bot_token="xoxb-fractal",
+        )
+    )
+
+    handler = MealPrepperBotHandler(
+        supervisor=MagicMock(),
+        recipe_repo=MagicMock(),
+        settings_service=settings_service,
+    )
+    reply = handler.handle("hello", channel="C_HEALTHY", workspace_id="T_FRACTAL")
+    assert reply.success is False
+    assert "start" in reply.text.lower()
+
+    start_reply = handler.handle("start", channel="C_HEALTHY", workspace_id="T_FRACTAL", slack_user_id="U123")
+    assert start_reply.success
+    assert "household" in start_reply.text.lower()
+
+    household_reply = handler.handle(
+        "household",
+        channel="C_HEALTHY",
+        workspace_id="T_FRACTAL",
+        slack_user_id="U123",
+    )
+    assert "in progress" in household_reply.text.lower()
+
+    name_reply = handler.handle(
+        "Thom's House",
+        channel="C_HEALTHY",
+        workspace_id="T_FRACTAL",
+        slack_user_id="U123",
+    )
+    assert "confirm" in name_reply.text.lower()
+    assert "nothing is stored" in name_reply.text.lower()
+
+    status_reply = handler.handle(
+        "status",
+        channel="C_HEALTHY",
+        workspace_id="T_FRACTAL",
+        slack_user_id="U123",
+    )
+    assert status_reply.success is False
+    assert "confirm" in status_reply.text.lower()
+
+
+def test_remove_keto_constraint():
+    from mealprepper.services.family_settings import FamilySettingsService
+
+    settings_service = MagicMock(spec=FamilySettingsService)
+    supervisor = MagicMock()
+    supervisor.family_context = MagicMock(family_id="friend")
+    supervisor.store = MagicMock(db_path="/tmp/x.db", family_id="friend")
+    settings_service.for_slack_workspace.return_value = supervisor.family_context
+    settings_service.remove_member_constraint.return_value = ["Alex"]
+
+    handler = MealPrepperBotHandler(
+        supervisor=supervisor,
+        recipe_repo=MagicMock(),
+        settings_service=settings_service,
+    )
+    reply = handler.handle("remove keto Alex", channel="C1", workspace_id="T_FRIEND")
+    assert reply.success
+    settings_service.remove_member_constraint.assert_called_once_with("friend", "keto", "Alex")
+    assert "next `plan-week`" in str(reply.blocks).lower()
+
+
+def test_settings_pantry_add():
+    from mealprepper.services.family_settings import FamilySettingsService
+
+    settings_service = MagicMock(spec=FamilySettingsService)
+    supervisor = MagicMock()
+    supervisor.family_context = MagicMock(family_id="friend")
+    supervisor.store = MagicMock(db_path="/tmp/x.db", family_id="friend")
+    settings_service.for_slack_workspace.return_value = supervisor.family_context
+    settings_service.add_pantry_item.return_value = "olive oil"
+
+    handler = MealPrepperBotHandler(
+        supervisor=supervisor,
+        recipe_repo=MagicMock(),
+        settings_service=settings_service,
+    )
+    reply = handler.handle("settings pantry add olive oil", channel="C1", workspace_id="T_FRIEND")
+    assert reply.success
+    settings_service.add_pantry_item.assert_called_once_with("friend", "olive oil")
+
+
+def test_settings_diet_section():
+    from mealprepper.services.family_settings import FamilySettingsService, SettingsSummary
+    from mealprepper.models.settings import MacroTrackingConfig
+
+    summary = SettingsSummary(
+        family_id="default",
+        timezone="America/New_York",
+        members=[{"id": "a1", "name": "Alex", "role": "adult", "constraints": {"keto": True}}],
+        dietary_household=["gluten_free"],
+        cuisine_preferences=[],
+        staple_patterns=[],
+        schedule={},
+        meal_blocks=[],
+        pantry_on_hand_count=0,
+        pantry_staples_count=0,
+        macro_tracking=MacroTrackingConfig(),
+    )
+    settings_service = MagicMock(spec=FamilySettingsService)
+    supervisor = MagicMock()
+    supervisor.family_context = MagicMock(family_id="default")
+    supervisor.store = MagicMock(family_id="default")
+    settings_service.for_slack_workspace.return_value = supervisor.family_context
+    settings_service.get_summary.return_value = summary
+
+    handler = MealPrepperBotHandler(
+        supervisor=supervisor,
+        recipe_repo=MagicMock(),
+        settings_service=settings_service,
+    )
+    reply = handler.handle("settings diet", channel="C123", workspace_id="T_DEV")
+    assert reply.success
+    assert "gluten_free" in str(reply.blocks).lower()
+

@@ -5,6 +5,7 @@ import logging
 from mealprepper.agents.base import AgentResult, BaseAgent
 from mealprepper.models.grocery import GroceryList
 from mealprepper.models.plans import WeeklyPlan
+from mealprepper.services.family_resolver import FamilyContext, FamilyResolver
 from mealprepper.skills.grocery_builder import GroceryBuilderSkill
 from mealprepper.skills.ingredient_synergy import IngredientSynergySkill
 from mealprepper.skills.inventory import InventorySkill
@@ -31,13 +32,20 @@ class GroceryListAgent(BaseAgent):
     def __init__(
         self,
         store: SQLiteStore | None = None,
+        family_context: FamilyContext | None = None,
         builder: GroceryBuilderSkill | None = None,
         inventory: InventorySkill | None = None,
         **kwargs,
     ) -> None:
         self.store = store or SQLiteStore()
+        self.family_context = family_context or FamilyResolver(
+            db_path=self.store.db_path,
+        ).for_family_id(self.store.family_id)
         self.builder = builder or GroceryBuilderSkill()
-        self.inventory = inventory or InventorySkill(self.store)
+        self.inventory = inventory or InventorySkill(
+            store=self.store,
+            family_context=self.family_context,
+        )
         super().__init__(**kwargs)
 
     def _register_tools(self) -> None:

@@ -308,3 +308,262 @@ INFO mealprepper.skills.comms.slack_bot: Slash command: user=U9H46P8AG channel=C
 INFO mealprepper.skills.comms.slack_bot: Reply (slash): success=True defer=None text='Monday · Sheet Pan Lemon Herb Chicken · Adult Dinner: Sheet Pan Lemon Herb Chicken\nIngredients\n• 1 tablespoon olive oil (plus extra for brushing)\n• 1/2  yellow '
 INFO mealprepper.skills.comms.slack_bot: Channel message: user=U9H46P8AG channel=C0B9DNL1XDF text='/mp recipe chicken salad'
 INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text='Monday · Sheet Pan Lemon Herb Chicken · Adult Dinner: Sheet Pan Lemon Herb Chicken\nIngredients\n• 1 tablespoon olive oil (plus extra for brushing)\n• 1/2  yellow '
+INFO slack_sdk.socket_mode.builtin.client: The connection seems to be stale. Disconnecting... (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e, reason: disconnected for 25+ seconds)
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 8ff5b4d3-63f7-4e64-8c65-a56aa317d081)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: aef40516-5642-48fc-8de6-5d6eaa8c131e)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 8ff5b4d3-63f7-4e64-8c65-a56aa317d081)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: 8ff5b4d3-63f7-4e64-8c65-a56aa317d081)
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: 8ff5b4d3-63f7-4e64-8c65-a56aa317d081)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 0938af27-eae4-490a-8358-7c7b8158f3bb)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 0938af27-eae4-490a-8358-7c7b8158f3bb)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: 0938af27-eae4-490a-8358-7c7b8158f3bb)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 47dab000-79cf-4a2f-9f45-72e7fbd09ed4)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: 0938af27-eae4-490a-8358-7c7b8158f3bb)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 47dab000-79cf-4a2f-9f45-72e7fbd09ed4)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: 47dab000-79cf-4a2f-9f45-72e7fbd09ed4)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: 47dab000-79cf-4a2f-9f45-72e7fbd09ed4)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: ef8b97cc-764f-4833-a5ed-c000d6677d39)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: 47dab000-79cf-4a2f-9f45-72e7fbd09ed4)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: ef8b97cc-764f-4833-a5ed-c000d6677d39)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: ef8b97cc-764f-4833-a5ed-c000d6677d39)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: ef8b97cc-764f-4833-a5ed-c000d6677d39)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: The connection seems to be stale. Disconnecting... (session id: be65e1e6-e550-44b0-86cc-55afa3456f51, reason: disconnected for 25+ seconds)
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: be65e1e6-e550-44b0-86cc-55afa3456f51, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: be65e1e6-e550-44b0-86cc-55afa3456f51, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: be65e1e6-e550-44b0-86cc-55afa3456f51, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: be65e1e6-e550-44b0-86cc-55afa3456f51, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+ERROR slack_sdk.socket_mode.builtin.client: Failed to check the current session or reconnect to the server (session id: be65e1e6-e550-44b0-86cc-55afa3456f51, error: URLError, message: <urlopen error [Errno -3] Temporary failure in name resolution>)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+ERROR slack_sdk.web.base_client: Failed to send a request to Slack API server: <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: A retry handler found: ConnectionErrorRetryHandler for POST https://slack.com/api/apps.connections.open - <urlopen error [Errno -3] Temporary failure in name resolution>
+INFO slack_sdk.web.base_client: Going to retry the same request: POST https://slack.com/api/apps.connections.open
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: c6f96af8-6598-4ac5-bf99-ae777ee8c7df)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: be65e1e6-e550-44b0-86cc-55afa3456f51)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: c6f96af8-6598-4ac5-bf99-ae777ee8c7df)
+INFO slack_sdk.socket_mode.builtin.client: Unable to send a ping message. Closing the connection... (session id: c6f96af8-6598-4ac5-bf99-ae777ee8c7df, reason: TLS/SSL connection has been closed (EOF) (_ssl.c:2427))
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: c6f96af8-6598-4ac5-bf99-ae777ee8c7df)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: c6f96af8-6598-4ac5-bf99-ae777ee8c7df)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: c6f96af8-6598-4ac5-bf99-ae777ee8c7df)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 3556a3ed-67b3-41ba-b48c-5b10ad08d219)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: c6f96af8-6598-4ac5-bf99-ae777ee8c7df)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 3556a3ed-67b3-41ba-b48c-5b10ad08d219)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: 3556a3ed-67b3-41ba-b48c-5b10ad08d219)
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: 3556a3ed-67b3-41ba-b48c-5b10ad08d219)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 76eb3594-6e1c-4a33-b9a4-d273b9f742a6)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 76eb3594-6e1c-4a33-b9a4-d273b9f742a6)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: 76eb3594-6e1c-4a33-b9a4-d273b9f742a6)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: 76eb3594-6e1c-4a33-b9a4-d273b9f742a6)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: f9dac282-32a2-464e-8c1b-df95b2ee9611)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: 76eb3594-6e1c-4a33-b9a4-d273b9f742a6)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: f9dac282-32a2-464e-8c1b-df95b2ee9611)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: f9dac282-32a2-464e-8c1b-df95b2ee9611)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 466128cf-bc60-4be5-b534-c85c8b991379)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: f9dac282-32a2-464e-8c1b-df95b2ee9611)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 466128cf-bc60-4be5-b534-c85c8b991379)
+INFO slack_sdk.socket_mode.builtin.client: Connecting to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: The connection has been closed (session id: 466128cf-bc60-4be5-b534-c85c8b991379)
+INFO slack_sdk.socket_mode.builtin.client: The session seems to be already closed. Reconnecting... (session id: 466128cf-bc60-4be5-b534-c85c8b991379)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 7ffabb56-8748-4eab-a05d-aed1e5f1221d)
+INFO slack_sdk.socket_mode.builtin.client: Connected to a new endpoint...
+INFO slack_sdk.socket_mode.builtin.client: Stopped receiving messages from a connection (session id: 466128cf-bc60-4be5-b534-c85c8b991379)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 7ffabb56-8748-4eab-a05d-aed1e5f1221d)
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 5edfface-90d7-4ee5-85cb-fa26f18959b2)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 5edfface-90d7-4ee5-85cb-fa26f18959b2)
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 31907ba2-4c8c-42b9-9df5-9c9711a2d243)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 31907ba2-4c8c-42b9-9df5-9c9711a2d243)
+INFO mealprepper.skills.comms.slack_bot: Slash command: user=U0FEZGPS7 channel=C0RNHDZ08 cmd=/mp text='help'
+INFO mealprepper.skills.comms.slack_bot: Reply (slash): success=False defer=None text='This bot is not configured for this channel.'
+INFO mealprepper.skills.comms.slack_bot: Slash command: user=U0FEZGPS7 channel=C0RNHDZ08 cmd=/mp text='help'
+INFO mealprepper.skills.comms.slack_bot: Reply (slash): success=False defer=None text='This bot is not configured for this channel.'
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 68539f89-16ff-4f1c-9622-a598ded64054)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 68539f89-16ff-4f1c-9622-a598ded64054)
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 36ca0aec-0002-4533-b416-4644b00b004c)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 36ca0aec-0002-4533-b416-4644b00b004c)
+INFO mealprepper.skills.comms.slack_bot: Slash command: user=U0FEZGPS7 channel=C0RNHDZ08 cmd=/mp text='help'
+INFO mealprepper.skills.comms.slack_bot: Reply (slash): success=True defer=None text="*MealPrepper — getting started*\n\nThis Slack workspace has MealPrepper installed but you haven't set up a household yet.\n\n• `start` — begin household setup\n• `help` — show this message\n"
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='/mp help'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text="*MealPrepper — getting started*\n\nThis Slack workspace has MealPrepper installed but you haven't set up a household yet.\n\n• `start` — begin household setup\n• `help` — show this message\n"
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='<@U0G36LZ9N> <@U0FJED2UQ> Can you guys try this?'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=False defer=None text='Welcome to MealPrepper! Reply `start` to set up your household.'
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='<@U21G58PC5> You could try it too pls'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=False defer=None text='Welcome to MealPrepper! Reply `start` to set up your household.'
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0HUXBUG6 team=T0FF2EHDM channel=C0RNHDZ08 text='<@U0HUXBUG6> has joined the channel'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=False defer=None text='Welcome to MealPrepper! Reply `start` to set up your household.'
+ERROR mealprepper.skills.comms.slack_bot: Slack request handler failed
+Traceback (most recent call last):
+  File "/home/ettikit/ai-stack/MealPrepper/src/mealprepper/skills/comms/slack_bot.py", line 124, in _on_request
+    self._handle_event(req.payload)
+  File "/home/ettikit/ai-stack/MealPrepper/src/mealprepper/skills/comms/slack_bot.py", line 229, in _handle_event
+    self._post_reply(channel, thread_ts, reply, workspace_id=team_id)
+  File "/home/ettikit/ai-stack/MealPrepper/src/mealprepper/skills/comms/slack_bot.py", line 329, in _post_reply
+    self._post_payloads(
+  File "/home/ettikit/ai-stack/MealPrepper/src/mealprepper/skills/comms/slack_bot.py", line 357, in _post_payloads
+    response = web_client.chat_postMessage(**kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/client.py", line 2823, in chat_postMessage
+    return self.api_call("chat.postMessage", json=kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/base_client.py", line 169, in api_call
+    return self._sync_send(api_url=api_url, req_args=req_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/base_client.py", line 200, in _sync_send
+    return self._urllib_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/base_client.py", line 331, in _urllib_api_call
+    ).validate()
+      ^^^^^^^^^^
+  File "/home/ettikit/ai-stack/MealPrepper/.venv/lib/python3.12/site-packages/slack_sdk/web/slack_response.py", line 195, in validate
+    raise e.SlackApiError(message=msg, response=self)
+slack_sdk.errors.SlackApiError: The request to the Slack API failed. (url: https://slack.com/api/chat.postMessage)
+The server responded with: {'ok': False, 'error': 'cannot_reply_to_message'}
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='<@U0HUXBUG6> you cuold try it too'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=False defer=None text='Welcome to MealPrepper! Reply `start` to set up your household.'
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0HUXBUG6 team=T0FF2EHDM channel=C0RNHDZ08 text='Start'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text="Let's set up your household!\n\nWhat would you like to call it? (e.g. *Alex's Family*)"
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 7212fcb6-6ecd-4a96-a8c7-18a9fa248d1b)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 7212fcb6-6ecd-4a96-a8c7-18a9fa248d1b)
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 4c3d7f9f-5ead-4303-88db-bbdf6d29416a)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 4c3d7f9f-5ead-4303-88db-bbdf6d29416a)
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: b2b3890f-dd12-41d9-8d9a-70aba430ee8a)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: b2b3890f-dd12-41d9-8d9a-70aba430ee8a)
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 95839b06-db2e-475a-9d9c-262460822077)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 95839b06-db2e-475a-9d9c-262460822077)
+INFO mealprepper.skills.comms.slack_bot: Slash command: user=U0FEZGPS7 channel=C0RNHDZ08 cmd=/mp text='start'
+INFO mealprepper.skills.comms.slack_bot: Reply (slash): success=True defer=None text="Let's set up your household!\n\nWhat would you like to call it? (e.g. *Alex's Family*)\n\n_Keep replying in this thread._"
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='/mp start'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text="Let's set up your household!\n\nWhat would you like to call it? (e.g. *Alex's Family*)\n\n_Keep replying in this thread._"
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='Dope Fam'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text='Create household *Dope Fam*?\n\nReply `confirm` to save it. (Nothing is stored until you confirm.)\nReply `cancel` to start over.'
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='confirm'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text='Your household *Dope Fam* is ready!\n\nSay `help` to see what you can do.'
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='help'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text='*MealPrepper commands*\n\n*Approvals*\n• `approve` — approve the pending weekly plan\n• `reject` — reject the plan (re-plan needed)\n\n*Planning*\n• `plan-week` — generate a new weekly plan (_requires confirmation_)\n• `confirm plan-week` — proceed'
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 893d4148-22eb-4bca-a480-ec7d8f26b826)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 893d4148-22eb-4bca-a480-ec7d8f26b826)
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: a4d6c8ad-620d-4d7e-aa3b-086f84b7c906)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: a4d6c8ad-620d-4d7e-aa3b-086f84b7c906)
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='help'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text="*MealPrepper — getting started*\n\nThis Slack workspace has MealPrepper installed but you haven't set up a household yet.\n\n• `start` — begin household setup\n• `household` — see setup progress or your saved household\n• `help` — show this messa"
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='household'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=False defer=None text="You don't have a household yet.\n\nReply `start` to set one up."
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='start'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text="Let's set up your household!\n\nWhat would you like to call it? (e.g. *Alex's Family*)\n\n_Keep replying in this thread._"
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='DopeHouse'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text='Create household *DopeHouse*?\n\nReply `confirm` to save it. (Nothing is stored until you confirm.)\nReply `cancel` to start over.'
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='confirm'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text='Your household *DopeHouse* is ready!\n\nNext up: a few quick questions so meal plans fit you.\n\nA few quick questions so plans fit your household. Reply in this thread — say `skip setup` anytime to finish later.\n\nAny dietary restrictions or al'
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='skip'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text="What's your main nutrition goal?\n\nReply with one: `maintain`, `cut`, `bulk`, or `weightlifting`\n(`cut` = fat loss, `bulk` = muscle gain, `weightlifting` = high-protein strength focus)\nReply `skip` to decide later."
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='skip'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text="What kinds of food do you enjoy?\n\nExamples: `Mexican, Mediterranean, comfort food, Asian stir-fry`\nYou can also mention foods to avoid, e.g. `love Italian, avoid seafood`\nReply `skip` if you're open to anything."
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='skip'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text='Who should meals be planned for?\n\nExamples:\n• `just me`\n• `me and my partner`\n• `family of 4` (2 adults + 2 kids)\n• `2 adults and a toddler`\nReply `skip` to start with one adult.'
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='just me'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text="You're all set! Your preferences are saved.\n\nTry `settings` to review, `plan-week` to generate a week, or `help` for commands."
+INFO mealprepper.skills.comms.slack_bot: Channel message: user=U0FEZGPS7 team=T0FF2EHDM channel=C0RNHDZ08 text='settings'
+INFO mealprepper.skills.comms.slack_bot: Reply (message): success=True defer=None text='Family settings · Timezone: America/NewYork\nHousehold diet: (none set)\nMembers:\n• DopeHouse (adult)\nPantry: 0 on-hand items, 0 weekly stap'
+INFO mealprepper.skills.comms.slack_bot: MealPrepper Slack bot listening (channel filter: C0B9DNL1XDF)
+INFO slack_sdk.socket_mode.builtin.client: A new session has been established (session id: 4ea2cac2-b571-4e40-9f8d-0aa1194bf211)
+INFO slack_sdk.socket_mode.builtin.client: Starting to receive messages from a new connection (session id: 4ea2cac2-b571-4e40-9f8d-0aa1194bf211)

@@ -158,7 +158,11 @@ family_notes, key_ingredients, and suggested meal_blocks — leave ingredients/s
         self.store = store or SQLiteStore(settings=self.settings)
         self.budget = load_context_budget(self.settings)
         self.llm = llm or OllamaClient(settings=self.settings, budget=self.budget)
-        self.index = RecipeIndex(db_path=self.store.db_path, settings=self.settings)
+        self.index = RecipeIndex(
+            db_path=self.store.db_path,
+            settings=self.settings,
+            family_id=self.store.family_id,
+        )
         cfg = self.settings.merged_config().get("index", {})
         self.recipe_top_k = int(cfg.get("recipe_top_k", 6))
 

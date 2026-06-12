@@ -6,6 +6,7 @@ from datetime import date
 from mealprepper.agents.base import AgentResult, BaseAgent
 from mealprepper.config import get_settings
 from mealprepper.models.plans import PlanStatus, WeeklyPlan
+from mealprepper.services.family_resolver import FamilyContext, FamilyResolver
 from mealprepper.skills.comms_formatter import CommsFormatterSkill
 from mealprepper.skills.feedback_collector import FeedbackCollectorSkill
 from mealprepper.skills.playbook_renderer import PlaybookRendererSkill
@@ -34,6 +35,7 @@ class CommunicationsAgent(BaseAgent):
     def __init__(
         self,
         store: SQLiteStore | None = None,
+        family_context: FamilyContext | None = None,
         comms: CommsCommunicatorSkill | None = None,
         formatter: CommsFormatterSkill | None = None,
         feedback: FeedbackCollectorSkill | None = None,
@@ -42,13 +44,32 @@ class CommunicationsAgent(BaseAgent):
         **kwargs,
     ) -> None:
         self.store = store or SQLiteStore()
-        self.comms = comms or CommsCommunicatorSkill()
+        self.settings = get_settings()
+        self.family_context = family_context or FamilyResolver(
+            db_path=self.store.db_path,
+            settings=self.settings,
+        ).for_family_id(self.store.family_id)
+        self.comms = comms or self._build_comms()
         self.formatter = formatter or CommsFormatterSkill()
         self.feedback = feedback or FeedbackCollectorSkill()
         self.preferences = preferences or PreferenceLearnerSkill(self.store)
         self.playbook = playbook or PlaybookRendererSkill()
-        self.settings = get_settings()
         super().__init__(**kwargs)
+
+    def _build_comms(self) -> CommsCommunicatorSkill:
+        backend_name = self.settings.comms_backend.lower()
+        slack = self.family_context.slack
+        if backend_name == "slack" and slack and slack.webhook_url:
+            from mealprepper.skills.comms.slack import SlackWebhookCommsBackend
+
+            return CommsCommunicatorSkill(
+                backend=SlackWebhookCommsBackend(
+                    self.settings,
+                    webhook_url=slack.webhook_url,
+                ),
+                settings=self.settings,
+            )
+        return CommsCommunicatorSkill(settings=self.settings)
 
     def _register_tools(self) -> None:
         self.register_tool("send_approval", "Notify family that weekly plan needs approval", self._send_approval)
@@ -118,7 +139,10 @@ class CommunicationsAgent(BaseAgent):
 
     def _send_approval(self, plan: WeeklyPlan, summary: str | None = None, **_) -> bool:
         body = summary or self.formatter.format_approval(plan)
-        return self.comms.send_approval_request(body)
+        channel = ""
+        if self.family_context.slack:
+            channel = self.family_context.slack.channel_id
+        return self.comms.send_approval_request(body, to=channel)
 
     def _send_daily(self, target: date | None = None, **_) -> bool:
         target = target or date.today()
@@ -135,7 +159,10 @@ class CommunicationsAgent(BaseAgent):
             return self.comms.send_daily_plan(body)
         summary = self.formatter.daily_summary_from_plan(plan, target)
         body = self.formatter.format_daily_summary(summary)
-        return self.comms.send_daily_plan(body)
+        channel = ""
+        if self.family_context.slack:
+            channel = self.family_context.slack.channel_id
+        return self.comms.send_daily_plan(body, to=channel)
 
     def _parse_feedback(self, text: str, meal_title: str = "", **kwargs):
         return self.feedback.parse_message(text, meal_title=meal_title, **kwargs)

@@ -14,11 +14,16 @@ SLACK_TEXT_LIMIT = 3900
 class SlackWebhookCommsBackend(CommsBackend):
     """Post messages to a Slack channel via an Incoming Webhook."""
 
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        webhook_url: str | None = None,
+    ) -> None:
         self.settings = settings or get_settings()
+        self.webhook_url = webhook_url or self.settings.slack_webhook_url
 
     def send(self, to: str, body: str) -> bool:
-        url = self.settings.slack_webhook_url
+        url = self.webhook_url
         if not url:
             raise RuntimeError("Set SLACK_WEBHOOK_URL in .env when COMMS_BACKEND=slack")
 

@@ -11,6 +11,7 @@ from typing import Iterator
 
 from mealprepper.config import Settings, get_settings
 from mealprepper.models.feedback import FeedbackRating, MealFeedback, PreferenceProfile
+from mealprepper.storage.migrations import DEFAULT_FAMILY_ID, run_migrations
 from mealprepper.models.grocery import GroceryList
 from mealprepper.models.meals import MealRecipe
 from mealprepper.models.recipe_repository import SavedRecipe
@@ -26,11 +27,20 @@ def _utcnow() -> datetime:
 
 
 class SQLiteStore:
-    def __init__(self, db_path: Path | None = None, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        db_path: Path | None = None,
+        settings: Settings | None = None,
+        family_id: str = DEFAULT_FAMILY_ID,
+    ) -> None:
         self.settings = settings or get_settings()
         self.db_path = db_path or self.settings.database_path
+        self.family_id = family_id
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
+
+    def _fid(self, family_id: str | None = None) -> str:
+        return family_id or self.family_id
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
@@ -48,6 +58,7 @@ class SQLiteStore:
                 """
                 CREATE TABLE IF NOT EXISTS weekly_plans (
                     id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     week_start TEXT NOT NULL,
                     week_end TEXT NOT NULL,
                     status TEXT NOT NULL,
@@ -59,6 +70,7 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS grocery_lists (
                     id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     weekly_plan_id TEXT,
                     week_label TEXT,
                     payload TEXT NOT NULL,
@@ -69,6 +81,7 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS meal_feedback (
                     id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     meal_title TEXT NOT NULL,
                     meal_block TEXT,
                     day TEXT,
@@ -81,12 +94,14 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS preferences (
                     id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     profile_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS preference_summaries (
                     id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     summary_text TEXT NOT NULL,
                     feedback_count INTEGER DEFAULT 0,
                     created_at TEXT NOT NULL
@@ -94,6 +109,7 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS inventory (
                     id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     item_name TEXT NOT NULL,
                     quantity TEXT,
                     category TEXT,
@@ -102,6 +118,7 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS approval_requests (
                     id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     weekly_plan_id TEXT NOT NULL,
                     status TEXT NOT NULL,
                     message TEXT,
@@ -112,6 +129,7 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS meal_index (
                     meal_id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     title TEXT NOT NULL,
                     meal_block TEXT,
                     day TEXT,
@@ -123,6 +141,7 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS feedback_index (
                     feedback_id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     meal_title TEXT NOT NULL,
                     meal_block TEXT,
                     rating TEXT NOT NULL,
@@ -132,6 +151,7 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS plan_index (
                     plan_id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     week_start TEXT NOT NULL,
                     week_end TEXT NOT NULL,
                     status TEXT NOT NULL,
@@ -141,6 +161,7 @@ class SQLiteStore:
 
                 CREATE TABLE IF NOT EXISTS recipe_repository (
                     id TEXT PRIMARY KEY,
+                    family_id TEXT NOT NULL DEFAULT 'default',
                     title TEXT NOT NULL,
                     source_type TEXT NOT NULL,
                     source_url TEXT,
@@ -158,6 +179,7 @@ class SQLiteStore:
                 );
                 """
             )
+            run_migrations(conn, settings=self.settings)
             self._migrate_fts(conn)
 
     def _migrate_fts(self, conn: sqlite3.Connection) -> None:
@@ -273,7 +295,13 @@ class SQLiteStore:
                         """
                     )
 
-    def save_weekly_plan(self, plan: WeeklyPlan) -> WeeklyPlan:
+    def save_weekly_plan(
+        self,
+        plan: WeeklyPlan,
+        *,
+        family_id: str | None = None,
+    ) -> WeeklyPlan:
+        fid = self._fid(family_id)
         plan_id = plan.id or str(uuid.uuid4())
         now = _utcnow().isoformat()
         payload = plan.model_dump(mode="json")
@@ -282,11 +310,12 @@ class SQLiteStore:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO weekly_plans
-                (id, week_start, week_end, status, payload, playbook_markdown, created_at, approved_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, family_id, week_start, week_end, status, payload, playbook_markdown, created_at, approved_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     plan_id,
+                    fid,
                     plan.week_start.isoformat(),
                     plan.week_end.isoformat(),
                     plan.status.value,
@@ -299,34 +328,48 @@ class SQLiteStore:
         plan.id = plan_id
         if not plan.created_at:
             plan.created_at = datetime.fromisoformat(now)
-        self._index_plan(plan)
+        self._index_plan(plan, family_id=fid)
         return plan
 
-    def _index_plan(self, plan: WeeklyPlan) -> None:
+    def _index_plan(self, plan: WeeklyPlan, *, family_id: str | None = None) -> None:
         from mealprepper.index.meal_index import MealIndex
         from mealprepper.index.plan_index import PlanIndex
 
+        fid = self._fid(family_id)
         try:
-            MealIndex(db_path=self.db_path, settings=self.settings).index_plan(plan)
-            PlanIndex(db_path=self.db_path, settings=self.settings).index_plan(plan)
+            MealIndex(db_path=self.db_path, settings=self.settings, family_id=fid).index_plan(plan)
+            PlanIndex(db_path=self.db_path, settings=self.settings, family_id=fid).index_plan(plan)
         except Exception as exc:
             logger.warning("Failed to index plan %s: %s", plan.id, exc)
 
-    def get_weekly_plan(self, plan_id: str) -> WeeklyPlan | None:
+    def get_weekly_plan(
+        self,
+        plan_id: str,
+        *,
+        family_id: str | None = None,
+    ) -> WeeklyPlan | None:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT payload FROM weekly_plans WHERE id = ?", (plan_id,)
+                "SELECT payload FROM weekly_plans WHERE id = ? AND family_id = ?",
+                (plan_id, fid),
             ).fetchone()
         if not row:
             return None
         return WeeklyPlan.model_validate(json.loads(row["payload"]))
 
-    def get_latest_plan(self, status: PlanStatus | None = None) -> WeeklyPlan | None:
-        query = "SELECT payload FROM weekly_plans"
-        params: tuple = ()
+    def get_latest_plan(
+        self,
+        status: PlanStatus | None = None,
+        *,
+        family_id: str | None = None,
+    ) -> WeeklyPlan | None:
+        fid = self._fid(family_id)
+        query = "SELECT payload FROM weekly_plans WHERE family_id = ?"
+        params: list = [fid]
         if status:
-            query += " WHERE status = ?"
-            params = (status.value,)
+            query += " AND status = ?"
+            params.append(status.value)
         query += " ORDER BY created_at DESC LIMIT 1"
         with self._conn() as conn:
             row = conn.execute(query, params).fetchone()
@@ -334,13 +377,20 @@ class SQLiteStore:
             return None
         return WeeklyPlan.model_validate(json.loads(row["payload"]))
 
-    def get_plan_for_date(self, target: date) -> WeeklyPlan | None:
+    def get_plan_for_date(
+        self,
+        target: date,
+        *,
+        family_id: str | None = None,
+    ) -> WeeklyPlan | None:
         """Return the best approved/active plan whose date range includes target."""
+        fid = self._fid(family_id)
         active_statuses = {PlanStatus.APPROVED, PlanStatus.ACTIVE}
         covering: list[WeeklyPlan] = []
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT payload FROM weekly_plans ORDER BY created_at DESC"
+                "SELECT payload FROM weekly_plans WHERE family_id = ? ORDER BY created_at DESC",
+                (fid,),
             ).fetchall()
         for row in rows:
             plan = WeeklyPlan.model_validate(json.loads(row["payload"]))
@@ -358,11 +408,17 @@ class SQLiteStore:
         )
         return covering[0]
 
-    def list_recent_plans(self, limit: int = 10) -> list[WeeklyPlan]:
+    def list_recent_plans(
+        self,
+        limit: int = 10,
+        *,
+        family_id: str | None = None,
+    ) -> list[WeeklyPlan]:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT payload FROM weekly_plans ORDER BY created_at DESC LIMIT ?",
-                (limit,),
+                "SELECT payload FROM weekly_plans WHERE family_id = ? ORDER BY created_at DESC LIMIT ?",
+                (fid, limit),
             ).fetchall()
         return [WeeklyPlan.model_validate(json.loads(r["payload"])) for r in rows]
 
@@ -372,6 +428,7 @@ class SQLiteStore:
         *,
         lookback_weeks: int = 2,
         statuses: set[PlanStatus] | None = None,
+        family_id: str | None = None,
     ) -> dict[str, set[str]]:
         """Meal titles from approved/active weeks in the lookback window before week_start."""
         if lookback_weeks < 1:
@@ -385,7 +442,7 @@ class SQLiteStore:
         cutoff_start = week_start - timedelta(weeks=lookback_weeks)
         dishes: dict[str, set[str]] = {}
 
-        for plan in self.list_recent_plans(limit=30):
+        for plan in self.list_recent_plans(limit=30, family_id=family_id):
             if plan.week_end >= week_start:
                 continue
             if plan.week_start < cutoff_start:
@@ -398,11 +455,17 @@ class SQLiteStore:
                     dishes.setdefault(meal.meal_block, set()).add(title)
         return dishes
 
-    def list_recent_feedback(self, limit: int = 15) -> list[MealFeedback]:
+    def list_recent_feedback(
+        self,
+        limit: int = 15,
+        *,
+        family_id: str | None = None,
+    ) -> list[MealFeedback]:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM meal_feedback ORDER BY created_at DESC LIMIT ?",
-                (limit,),
+                "SELECT * FROM meal_feedback WHERE family_id = ? ORDER BY created_at DESC LIMIT ?",
+                (fid, limit),
             ).fetchall()
         return [
             MealFeedback(
@@ -419,16 +482,28 @@ class SQLiteStore:
             for r in rows
         ]
 
-    def update_plan_status(self, plan_id: str, status: PlanStatus) -> None:
-        plan = self.get_weekly_plan(plan_id)
+    def update_plan_status(
+        self,
+        plan_id: str,
+        status: PlanStatus,
+        *,
+        family_id: str | None = None,
+    ) -> None:
+        plan = self.get_weekly_plan(plan_id, family_id=family_id)
         if not plan:
             raise ValueError(f"Plan not found: {plan_id}")
         plan.status = status
         if status == PlanStatus.APPROVED:
             plan.approved_at = _utcnow()
-        self.save_weekly_plan(plan)
+        self.save_weekly_plan(plan, family_id=family_id)
 
-    def save_grocery_list(self, grocery: GroceryList) -> GroceryList:
+    def save_grocery_list(
+        self,
+        grocery: GroceryList,
+        *,
+        family_id: str | None = None,
+    ) -> GroceryList:
+        fid = self._fid(family_id)
         gid = grocery.id or str(uuid.uuid4())
         now = _utcnow().isoformat()
         payload = grocery.model_dump(mode="json")
@@ -437,11 +512,12 @@ class SQLiteStore:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO grocery_lists
-                (id, weekly_plan_id, week_label, payload, ready_for_shopping, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (id, family_id, weekly_plan_id, week_label, payload, ready_for_shopping, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     gid,
+                    fid,
                     grocery.weekly_plan_id,
                     grocery.week_label,
                     json.dumps(payload),
@@ -452,47 +528,76 @@ class SQLiteStore:
         grocery.id = gid
         return grocery
 
-    def get_grocery_for_plan(self, plan_id: str) -> GroceryList | None:
+    def get_grocery_for_plan(
+        self,
+        plan_id: str,
+        *,
+        family_id: str | None = None,
+    ) -> GroceryList | None:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT payload FROM grocery_lists WHERE weekly_plan_id = ? ORDER BY created_at DESC LIMIT 1",
-                (plan_id,),
+                """
+                SELECT payload FROM grocery_lists
+                WHERE weekly_plan_id = ? AND family_id = ?
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (plan_id, fid),
             ).fetchone()
         if not row:
             return None
         return GroceryList.model_validate(json.loads(row["payload"]))
 
-    def get_grocery(self, grocery_id: str) -> GroceryList | None:
+    def get_grocery(
+        self,
+        grocery_id: str,
+        *,
+        family_id: str | None = None,
+    ) -> GroceryList | None:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT payload FROM grocery_lists WHERE id = ?",
-                (grocery_id,),
+                "SELECT payload FROM grocery_lists WHERE id = ? AND family_id = ?",
+                (grocery_id, fid),
             ).fetchone()
         if not row:
             return None
         return GroceryList.model_validate(json.loads(row["payload"]))
 
-    def get_latest_grocery(self) -> GroceryList | None:
+    def get_latest_grocery(self, *, family_id: str | None = None) -> GroceryList | None:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT payload FROM grocery_lists ORDER BY created_at DESC LIMIT 1"
+                """
+                SELECT payload FROM grocery_lists
+                WHERE family_id = ?
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (fid,),
             ).fetchone()
         if not row:
             return None
         return GroceryList.model_validate(json.loads(row["payload"]))
 
-    def save_feedback(self, feedback: MealFeedback) -> MealFeedback:
+    def save_feedback(
+        self,
+        feedback: MealFeedback,
+        *,
+        family_id: str | None = None,
+    ) -> MealFeedback:
+        store_fid = self._fid(family_id)
         fid = feedback.id or str(uuid.uuid4())
         now = _utcnow().isoformat()
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO meal_feedback
-                (id, meal_title, meal_block, day, rating, comment, member_id, created_at, applied)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, family_id, meal_title, meal_block, day, rating, comment, member_id, created_at, applied)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     fid,
+                    store_fid,
                     feedback.meal_title,
                     feedback.meal_block,
                     feedback.day,
@@ -504,21 +609,32 @@ class SQLiteStore:
                 ),
             )
         feedback.id = fid
-        self._index_feedback(feedback)
+        self._index_feedback(feedback, family_id=store_fid)
         return feedback
 
-    def _index_feedback(self, feedback: MealFeedback) -> None:
+    def _index_feedback(self, feedback: MealFeedback, *, family_id: str | None = None) -> None:
         from mealprepper.index.preference_index import PreferenceIndex
 
+        fid = self._fid(family_id)
         try:
-            PreferenceIndex(db_path=self.db_path, settings=self.settings).index_feedback(feedback)
+            PreferenceIndex(
+                db_path=self.db_path,
+                settings=self.settings,
+                family_id=fid,
+            ).index_feedback(feedback)
         except Exception as exc:
             logger.warning("Failed to index feedback %s: %s", feedback.id, exc)
 
-    def get_unapplied_feedback(self) -> list[MealFeedback]:
+    def get_unapplied_feedback(self, *, family_id: str | None = None) -> list[MealFeedback]:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM meal_feedback WHERE applied = 0 ORDER BY created_at"
+                """
+                SELECT * FROM meal_feedback
+                WHERE applied = 0 AND family_id = ?
+                ORDER BY created_at
+                """,
+                (fid,),
             ).fetchall()
         return [
             MealFeedback(
@@ -535,72 +651,121 @@ class SQLiteStore:
             for r in rows
         ]
 
-    def mark_feedback_applied(self, feedback_ids: list[str]) -> None:
+    def mark_feedback_applied(
+        self,
+        feedback_ids: list[str],
+        *,
+        family_id: str | None = None,
+    ) -> None:
+        fid = self._fid(family_id)
         with self._conn() as conn:
-            for fid in feedback_ids:
-                conn.execute("UPDATE meal_feedback SET applied = 1 WHERE id = ?", (fid,))
+            for feedback_id in feedback_ids:
+                conn.execute(
+                    "UPDATE meal_feedback SET applied = 1 WHERE id = ? AND family_id = ?",
+                    (feedback_id, fid),
+                )
 
-    def get_preferences(self) -> PreferenceProfile:
+    def get_preferences(self, *, family_id: str | None = None) -> PreferenceProfile:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT profile_json FROM preferences ORDER BY updated_at DESC LIMIT 1"
+                """
+                SELECT profile_json FROM preferences
+                WHERE family_id = ?
+                ORDER BY updated_at DESC LIMIT 1
+                """,
+                (fid,),
             ).fetchone()
         if not row:
             return PreferenceProfile()
         return PreferenceProfile.model_validate(json.loads(row["profile_json"]))
 
-    def save_preferences(self, profile: PreferenceProfile) -> None:
+    def save_preferences(
+        self,
+        profile: PreferenceProfile,
+        *,
+        family_id: str | None = None,
+    ) -> None:
+        fid = self._fid(family_id)
         pid = str(uuid.uuid4())
         now = _utcnow().isoformat()
         with self._conn() as conn:
             conn.execute(
-                "INSERT INTO preferences (id, profile_json, updated_at) VALUES (?, ?, ?)",
-                (pid, json.dumps(profile.model_dump(mode="json")), now),
+                "INSERT INTO preferences (id, family_id, profile_json, updated_at) VALUES (?, ?, ?, ?)",
+                (pid, fid, json.dumps(profile.model_dump(mode="json")), now),
             )
 
-    def save_preference_summary(self, summary_text: str, feedback_count: int = 0) -> None:
+    def save_preference_summary(
+        self,
+        summary_text: str,
+        feedback_count: int = 0,
+        *,
+        family_id: str | None = None,
+    ) -> None:
+        fid = self._fid(family_id)
         pid = str(uuid.uuid4())
         now = _utcnow().isoformat()
         with self._conn() as conn:
             conn.execute(
                 """
-                INSERT INTO preference_summaries (id, summary_text, feedback_count, created_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO preference_summaries (id, family_id, summary_text, feedback_count, created_at)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (pid, summary_text, feedback_count, now),
+                (pid, fid, summary_text, feedback_count, now),
             )
 
-    def get_latest_preference_summary(self) -> str:
+    def get_latest_preference_summary(self, *, family_id: str | None = None) -> str:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT summary_text FROM preference_summaries ORDER BY created_at DESC LIMIT 1"
+                """
+                SELECT summary_text FROM preference_summaries
+                WHERE family_id = ?
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (fid,),
             ).fetchone()
         return row["summary_text"] if row else ""
 
-    def get_compact_preferences(self) -> PreferenceProfile:
+    def get_compact_preferences(self, *, family_id: str | None = None) -> PreferenceProfile:
         """Preference profile augmented with stored compressed summary in notes."""
         from mealprepper.context.compressor import ContextCompressor
 
-        profile = self.get_preferences()
-        summary = self.get_latest_preference_summary()
+        profile = self.get_preferences(family_id=family_id)
+        summary = self.get_latest_preference_summary(family_id=family_id)
         if summary and summary not in profile.notes:
             profile.notes = ContextCompressor().merge_notes(profile.notes, summary)
         return ContextCompressor().compress_profile(profile)
 
-    def create_approval_request(self, plan_id: str, message: str) -> str:
+    def create_approval_request(
+        self,
+        plan_id: str,
+        message: str,
+        *,
+        family_id: str | None = None,
+    ) -> str:
+        fid = self._fid(family_id)
         rid = str(uuid.uuid4())
         now = _utcnow().isoformat()
         with self._conn() as conn:
             conn.execute(
                 """
-                INSERT INTO approval_requests (id, weekly_plan_id, status, message, created_at)
-                VALUES (?, ?, 'pending', ?, ?)
+                INSERT INTO approval_requests (id, family_id, weekly_plan_id, status, message, created_at)
+                VALUES (?, ?, ?, 'pending', ?, ?)
                 """,
-                (rid, plan_id, message, now),
+                (rid, fid, plan_id, message, now),
             )
         return rid
 
-    def resolve_approval(self, request_id: str, approved: bool, response: str = "") -> None:
+    def resolve_approval(
+        self,
+        request_id: str,
+        approved: bool,
+        response: str = "",
+        *,
+        family_id: str | None = None,
+    ) -> None:
+        fid = self._fid(family_id)
         status = "approved" if approved else "rejected"
         now = _utcnow().isoformat()
         with self._conn() as conn:
@@ -608,67 +773,120 @@ class SQLiteStore:
                 """
                 UPDATE approval_requests
                 SET status = ?, response = ?, resolved_at = ?
-                WHERE id = ?
+                WHERE id = ? AND family_id = ?
                 """,
-                (status, response, now, request_id),
+                (status, response, now, request_id, fid),
             )
 
-    def get_pending_approval(self) -> dict | None:
+    def get_pending_approval(self, *, family_id: str | None = None) -> dict | None:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT * FROM approval_requests WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1"
+                """
+                SELECT * FROM approval_requests
+                WHERE status = 'pending' AND family_id = ?
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (fid,),
             ).fetchone()
         return dict(row) if row else None
 
-    def save_saved_recipe(self, recipe: SavedRecipe) -> SavedRecipe:
+    def save_saved_recipe(
+        self,
+        recipe: SavedRecipe,
+        *,
+        family_id: str | None = None,
+    ) -> SavedRecipe:
         from mealprepper.index.recipe_index import RecipeIndex
 
+        fid = self._fid(family_id)
         recipe_id = recipe.id or str(uuid.uuid4())
         now = _utcnow()
         recipe.id = recipe_id
         recipe.created_at = recipe.created_at or now
         recipe.updated_at = now
-        RecipeIndex(db_path=self.db_path, settings=self.settings).index_recipe(recipe)
+        RecipeIndex(
+            db_path=self.db_path,
+            settings=self.settings,
+            family_id=fid,
+        ).index_recipe(recipe)
         return recipe
 
-    def get_saved_recipe(self, recipe_id: str) -> SavedRecipe | None:
+    def get_saved_recipe(
+        self,
+        recipe_id: str,
+        *,
+        family_id: str | None = None,
+    ) -> SavedRecipe | None:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT * FROM recipe_repository WHERE id = ?",
-                (recipe_id,),
+                "SELECT * FROM recipe_repository WHERE id = ? AND family_id = ?",
+                (recipe_id, fid),
             ).fetchone()
         if not row:
             return None
         return self._row_to_saved_recipe(row)
 
-    def find_saved_recipe_by_hash(self, content_hash: str) -> SavedRecipe | None:
+    def find_saved_recipe_by_hash(
+        self,
+        content_hash: str,
+        *,
+        family_id: str | None = None,
+    ) -> SavedRecipe | None:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT * FROM recipe_repository WHERE content_hash = ? ORDER BY updated_at DESC LIMIT 1",
-                (content_hash,),
+                """
+                SELECT * FROM recipe_repository
+                WHERE content_hash = ? AND family_id = ?
+                ORDER BY updated_at DESC LIMIT 1
+                """,
+                (content_hash, fid),
             ).fetchone()
         if not row:
             return None
         return self._row_to_saved_recipe(row)
 
-    def list_saved_recipes(self, limit: int = 50) -> list[SavedRecipe]:
+    def list_saved_recipes(
+        self,
+        limit: int = 50,
+        *,
+        family_id: str | None = None,
+    ) -> list[SavedRecipe]:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             if limit <= 0:
                 rows = conn.execute(
-                    "SELECT * FROM recipe_repository ORDER BY updated_at DESC",
+                    """
+                    SELECT * FROM recipe_repository
+                    WHERE family_id = ?
+                    ORDER BY updated_at DESC
+                    """,
+                    (fid,),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT * FROM recipe_repository ORDER BY updated_at DESC LIMIT ?",
-                    (limit,),
+                    """
+                    SELECT * FROM recipe_repository
+                    WHERE family_id = ?
+                    ORDER BY updated_at DESC LIMIT ?
+                    """,
+                    (fid, limit),
                 ).fetchall()
         return [self._row_to_saved_recipe(row) for row in rows]
 
-    def delete_saved_recipe(self, recipe_id: str) -> bool:
+    def delete_saved_recipe(
+        self,
+        recipe_id: str,
+        *,
+        family_id: str | None = None,
+    ) -> bool:
+        fid = self._fid(family_id)
         with self._conn() as conn:
             cursor = conn.execute(
-                "DELETE FROM recipe_repository WHERE id = ?",
-                (recipe_id,),
+                "DELETE FROM recipe_repository WHERE id = ? AND family_id = ?",
+                (recipe_id, fid),
             )
             return cursor.rowcount > 0
 

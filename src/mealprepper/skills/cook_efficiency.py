@@ -5,6 +5,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from mealprepper.config import Settings, get_settings
+from mealprepper.services.family_resolver import PlanningConfig
 from mealprepper.skills.food_shelf_life import FoodShelfLifeSkill
 from mealprepper.models.plans import WeeklyPlan
 from mealprepper.skills.meal_blocks import DAYS, WeekMealOutline
@@ -20,6 +21,17 @@ class CookEfficiencyConfig:
     max_dinner_cook_sessions: int = 4
     cross_block_reuse: bool = True
     repeat_dinners: bool = True
+
+    @classmethod
+    def from_planning(cls, planning: PlanningConfig) -> CookEfficiencyConfig:
+        raw = planning.cook_efficiency
+        return cls(
+            enabled=bool(raw.get("enabled", True)),
+            min_unique_per_block=int(raw.get("min_unique_per_block", 2)),
+            max_dinner_cook_sessions=int(raw.get("max_dinner_cook_sessions", 4)),
+            cross_block_reuse=bool(raw.get("cross_block_reuse", True)),
+            repeat_dinners=bool(raw.get("repeat_dinners", True)),
+        )
 
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> CookEfficiencyConfig:

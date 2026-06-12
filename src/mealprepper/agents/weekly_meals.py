@@ -6,8 +6,9 @@ from datetime import date
 from mealprepper.agents.base import AgentResult, BaseAgent
 from mealprepper.config import get_settings
 from mealprepper.context.budget import load_context_budget
-from mealprepper.models.family import FamilyProfile
 from mealprepper.models.plans import PlanStatus, WeeklyPlan
+from mealprepper.services.family_prompts import weekly_meals_system_prompt
+from mealprepper.services.family_resolver import FamilyContext, FamilyResolver
 from mealprepper.skills.food_shelf_life import FoodShelfLifeSkill
 from mealprepper.skills.ingredient_synergy import IngredientSynergySkill
 from mealprepper.skills.meal_finder import MealFinderSkill
@@ -17,32 +18,13 @@ from mealprepper.storage.sqlite import SQLiteStore
 logger = logging.getLogger(__name__)
 
 
-WEEKLY_MEALS_SYSTEM = """You are the Weekly Meals Agent for MealPrepper.
-
-Your responsibilities:
-- Find age-appropriate meals for toddler, infant (BLW), and adults
-- Organize the week covering all meal blocks (school/weekend lunches, breakfasts, dinners, BLW, bulk prep)
-- Synergize ingredients to minimize waste and overlap with the Grocery List Agent
-- Validate leftover timing so seafood and other short-life foods are not reused too late
-- Ensure toddler meals cover carb, protein, veggie, fruit, fat (via FoodGroupsSkill)
-- Track preferences and feedback from past weeks
-
-Constraints:
-- Toddler: no spicy; dinner ready by 5:30pm; max 45min dinner prep; quick lunches
-- Infant: BLW finger foods with prep guidance
-- Adults: variable breakfast, bulk-preppable lunches, shared quick dinners
-- Family are competent cooks; prefer practical real meals
-
-Available tools: find_meals, organize_week, validate_shelf_life, synergize_ingredients, load_preferences, save_plan"""
-
-
 class WeeklyMealsAgent(BaseAgent):
     name = "weekly_meals"
-    system_prompt = WEEKLY_MEALS_SYSTEM
 
     def __init__(
         self,
         store: SQLiteStore | None = None,
+        family_context: FamilyContext | None = None,
         meal_finder: MealFinderSkill | None = None,
         week_organizer: WeekOrganizerSkill | None = None,
         synergy: IngredientSynergySkill | None = None,
@@ -52,14 +34,19 @@ class WeeklyMealsAgent(BaseAgent):
         self.settings = get_settings()
         self.budget = load_context_budget(self.settings)
         self.store = store or SQLiteStore(settings=self.settings)
+        self.family_context = family_context or FamilyResolver(
+            db_path=self.store.db_path,
+            settings=self.settings,
+        ).for_family_id(self.store.family_id)
+        self.system_prompt = weekly_meals_system_prompt(self.family_context)
         self.meal_finder = meal_finder or MealFinderSkill(
             store=self.store,
             budget=self.budget,
+            family_context=self.family_context,
         )
         self.week_organizer = week_organizer or WeekOrganizerSkill(self.meal_finder)
         self.synergy = synergy or IngredientSynergySkill()
         self.shelf_life = shelf_life or FoodShelfLifeSkill()
-        self.family = FamilyProfile.from_config(self.settings.merged_config())
         super().__init__(llm=self.meal_finder.llm, **kwargs)
 
     def _register_tools(self) -> None:
@@ -93,11 +80,15 @@ class WeeklyMealsAgent(BaseAgent):
     def _find_meals(self, week_start: date | None = None, **_) -> list:
         prefs = self.store.get_compact_preferences()
         start = week_start or self.week_organizer.week_bounds()[0]
-        return self.meal_finder.find_week_outline(self.family, prefs, start)
+        return self.meal_finder.find_week_outline(self.family_context.profile, prefs, start)
 
     def _organize_week(self, week_start: date | None = None, preferences=None, **_) -> WeeklyPlan:
         prefs = preferences or self.store.get_compact_preferences()
-        return self.week_organizer.organize_week(self.family, prefs, week_start)
+        return self.week_organizer.organize_week(
+            self.family_context.profile,
+            prefs,
+            week_start,
+        )
 
     def _validate_shelf_life(self, plan: WeeklyPlan, **_) -> WeeklyPlan:
         audit = self.shelf_life.audit_plan(plan)

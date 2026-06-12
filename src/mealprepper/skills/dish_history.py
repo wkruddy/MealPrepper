@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import TYPE_CHECKING, Any
 
 from mealprepper.config import Settings, get_settings
 from mealprepper.storage.sqlite import SQLiteStore
+
+if TYPE_CHECKING:
+    from mealprepper.services.family_resolver import FamilyContext
 
 
 def normalize_title(title: str) -> str:
@@ -13,11 +17,22 @@ def normalize_title(title: str) -> str:
 class DishHistorySkill:
     """Track recently served dishes and format exclusion context for planning."""
 
-    def __init__(self, store: SQLiteStore | None = None, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        store: SQLiteStore | None = None,
+        settings: Settings | None = None,
+        family_context: FamilyContext | Any | None = None,
+        lookback_weeks: int | None = None,
+    ) -> None:
         self.settings = settings or get_settings()
         self.store = store or SQLiteStore(settings=self.settings)
-        planning_cfg = self.settings.merged_config().get("planning", {})
-        self.lookback_weeks = int(planning_cfg.get("dish_lookback_weeks", 2))
+        if lookback_weeks is not None:
+            self.lookback_weeks = lookback_weeks
+        elif family_context is not None:
+            self.lookback_weeks = family_context.planning.dish_lookback_weeks
+        else:
+            planning_cfg = self.settings.merged_config().get("planning", {})
+            self.lookback_weeks = int(planning_cfg.get("dish_lookback_weeks", 2))
 
     def recent_titles_by_block(
         self,

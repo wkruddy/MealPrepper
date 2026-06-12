@@ -11,6 +11,8 @@ from mealprepper.index.plan_index import PlanIndex
 from mealprepper.index.preference_index import PreferenceIndex
 from mealprepper.llm.ollama_client import OllamaClient, OllamaUnavailableError, _extract_json
 from mealprepper.models.family import FamilyProfile
+from mealprepper.services.family_prompts import meal_finder_system_prompt
+from mealprepper.services.family_resolver import FamilyContext, PlanningConfig
 from mealprepper.models.feedback import PreferenceProfile
 from mealprepper.models.meals import MealRecipe, PlannedMeal, RecipeStep
 from mealprepper.skills.blw_safety import BLWSafety
@@ -62,29 +64,50 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
         meal_index: MealIndex | None = None,
         preference_index: PreferenceIndex | None = None,
         plan_index: PlanIndex | None = None,
+        family_context: FamilyContext | None = None,
     ) -> None:
         self.settings = get_settings()
+        self.family_context = family_context
         self.budget = budget or load_context_budget(self.settings)
         self.llm = llm or OllamaClient(settings=self.settings, budget=self.budget)
         self.store = store or SQLiteStore(settings=self.settings)
-        self.meal_index = meal_index or MealIndex(settings=self.settings)
-        self.preference_index = preference_index or PreferenceIndex(settings=self.settings)
-        self.plan_index = plan_index or PlanIndex(settings=self.settings)
+        fid = family_context.family_id if family_context else self.store.family_id
+        self.meal_index = meal_index or MealIndex(settings=self.settings, family_id=fid)
+        self.preference_index = preference_index or PreferenceIndex(settings=self.settings, family_id=fid)
+        self.plan_index = plan_index or PlanIndex(settings=self.settings, family_id=fid)
         cfg = self.settings.merged_config()
         index_cfg = cfg.get("index", {})
         planning_cfg = cfg.get("planning", {})
+        planning = (
+            family_context.planning
+            if family_context
+            else PlanningConfig.from_json(planning_cfg)
+        )
+        self.system_prompt = (
+            meal_finder_system_prompt(family_context)
+            if family_context
+            else self.SYSTEM
+        )
         self.meal_top_k = int(index_cfg.get("meal_top_k", 5))
         self.feedback_top_k = int(index_cfg.get("feedback_top_k", 8))
-        self.max_meal_repeat = int(planning_cfg.get("max_meal_repeat_days", 2))
+        self.max_meal_repeat = planning.max_meal_repeat_days
         self.recipe_top_k = int(index_cfg.get("recipe_top_k", 6))
         self.catalog = MealCatalog(self.settings)
-        self.dish_history = DishHistorySkill(store=self.store, settings=self.settings)
+        self.dish_history = DishHistorySkill(
+            store=self.store,
+            settings=self.settings,
+            family_context=family_context,
+        )
         self.recipe_repo = RecipeRepositorySkill(store=self.store, llm=self.llm, settings=self.settings)
         from mealprepper.skills.cook_efficiency import CookEfficiencyConfig
 
-        self.cook_efficiency = CookEfficiencyConfig.from_settings(self.settings)
+        self.cook_efficiency = (
+            CookEfficiencyConfig.from_planning(planning)
+            if family_context
+            else CookEfficiencyConfig.from_settings(self.settings)
+        )
         self.food_groups = FoodGroupsSkill(self.settings)
-        cohesion_cfg = planning_cfg.get("ingredient_cohesion", {})
+        cohesion_cfg = planning.ingredient_cohesion
         self.cohesion_enabled = bool(cohesion_cfg.get("enabled", True))
         self.cohesion_top_n = int(cohesion_cfg.get("anchor_top_n", 10))
         self.cohesion_min_mentions = int(cohesion_cfg.get("min_mentions", 2))
@@ -110,7 +133,7 @@ Adult dinners must be ready within 45 minutes total prep+cook."""
         builder = PromptBuilder(
             budget=self.budget,
             call_type=CallType.MEAL_FINDER,
-            system=self.SYSTEM,
+            system=self.system_prompt,
             task=f"Plan meals for week starting {week_start} ({week_start} to {week_end}).",
         )
         builder.add_section("Family", self._family_context(family), priority=10)
@@ -251,7 +274,7 @@ Cover every required block for each day.""",
         builder = PromptBuilder(
             budget=self.budget,
             call_type=CallType.RECIPE_EXPAND,
-            system=self.SYSTEM,
+            system=self.system_prompt,
             task=(
                 f"Expand this meal into a full recipe JSON object:\n"
                 f"Title: {outline.title}\n"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+import json
 from enum import Enum
 from typing import Any
 
@@ -10,7 +10,10 @@ from pydantic import BaseModel, Field, model_validator
 class MemberRole(str, Enum):
     TODDLER = "toddler"
     INFANT = "infant"
+    CHILD = "child"
+    TEEN = "teen"
     ADULT = "adult"
+    SENIOR = "senior"
 
 
 class MealBlock(str, Enum):
@@ -74,6 +77,40 @@ class FamilyProfile(BaseModel):
             members=members,
             meal_blocks=config.get("meal_blocks", []),
             schedule=config.get("schedule", {}),
+        )
+
+    @classmethod
+    def from_db(
+        cls,
+        *,
+        timezone: str,
+        members: list[dict[str, Any]],
+        meal_blocks: list[str],
+        schedule: dict[str, str],
+    ) -> FamilyProfile:
+        parsed_members = []
+        for row in members:
+            constraints_raw = row.get("constraints_json") or row.get("constraints") or "{}"
+            if isinstance(constraints_raw, str):
+                constraints = json.loads(constraints_raw) if constraints_raw else {}
+            else:
+                constraints = constraints_raw
+            parsed_members.append(
+                FamilyMember(
+                    id=row["id"],
+                    name=row.get("display_name") or row.get("name") or row["id"],
+                    role=MemberRole(row["role"]),
+                    age_years=row.get("age_years"),
+                    age_months=row.get("age_months"),
+                    constraints=constraints,
+                    notes=row.get("notes") or "",
+                )
+            )
+        return cls(
+            timezone=timezone,
+            members=parsed_members,
+            meal_blocks=meal_blocks,
+            schedule=schedule,
         )
 
     def member_ids(self) -> list[str]:

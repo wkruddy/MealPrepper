@@ -9,6 +9,7 @@ from pathlib import Path
 from mealprepper.config import Settings, get_settings
 from mealprepper.context.compressor import ContextCompressor
 from mealprepper.models.plans import WeeklyPlan
+from mealprepper.storage.migrations import DEFAULT_FAMILY_ID
 from mealprepper.storage.sqlite import ensure_db_schema
 
 logger = logging.getLogger(__name__)
@@ -27,9 +28,15 @@ class IndexedPlan:
 class PlanIndex:
     """Index past weekly plans; retrieve similar weeks or recent summaries."""
 
-    def __init__(self, db_path: Path | None = None, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        db_path: Path | None = None,
+        settings: Settings | None = None,
+        family_id: str = DEFAULT_FAMILY_ID,
+    ) -> None:
         self.settings = settings or get_settings()
         self.db_path = db_path or self.settings.database_path
+        self.family_id = family_id
         ensure_db_schema(self.db_path, self.settings)
         self._compressor = ContextCompressor()
 
@@ -49,11 +56,12 @@ class PlanIndex:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO plan_index
-                (plan_id, week_start, week_end, status, summary, body)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (plan_id, family_id, week_start, week_end, status, summary, body)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     plan_id,
+                    self.family_id,
                     plan.week_start.isoformat(),
                     plan.week_end.isoformat(),
                     plan.status.value,
@@ -74,13 +82,13 @@ class PlanIndex:
                    bm25(plan_index_fts) AS score
             FROM plan_index_fts fts
             JOIN plan_index p ON p.rowid = fts.rowid
-            WHERE plan_index_fts MATCH ?
+            WHERE plan_index_fts MATCH ? AND p.family_id = ?
             ORDER BY score
             LIMIT ?
         """
         with self._connect() as conn:
             try:
-                rows = conn.execute(sql, (fts_query, top_k)).fetchall()
+                rows = conn.execute(sql, (fts_query, self.family_id, top_k)).fetchall()
                 return [self._row_to_plan(r) for r in rows]
             except sqlite3.OperationalError:
                 return self.recent(top_k=top_k)
@@ -88,10 +96,12 @@ class PlanIndex:
     def recent(self, top_k: int = 3) -> list[IndexedPlan]:
         sql = """
             SELECT plan_id, week_start, week_end, status, summary, 0 AS score
-            FROM plan_index ORDER BY week_start DESC LIMIT ?
+            FROM plan_index
+            WHERE family_id = ?
+            ORDER BY week_start DESC LIMIT ?
         """
         with self._connect() as conn:
-            rows = conn.execute(sql, (top_k,)).fetchall()
+            rows = conn.execute(sql, (self.family_id, top_k)).fetchall()
         return [self._row_to_plan(r) for r in rows]
 
     def similar_to_week(self, week_start: date, query_ingredients: str = "", top_k: int = 2) -> str:

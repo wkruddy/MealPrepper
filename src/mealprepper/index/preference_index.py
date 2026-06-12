@@ -7,6 +7,7 @@ from pathlib import Path
 
 from mealprepper.config import Settings, get_settings
 from mealprepper.models.feedback import FeedbackRating, MealFeedback
+from mealprepper.storage.migrations import DEFAULT_FAMILY_ID
 from mealprepper.storage.sqlite import ensure_db_schema
 
 logger = logging.getLogger(__name__)
@@ -28,9 +29,15 @@ class IndexedFeedback:
 class PreferenceIndex:
     """Index feedback entries; retrieve relevant likes/dislikes for meal block or query."""
 
-    def __init__(self, db_path: Path | None = None, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        db_path: Path | None = None,
+        settings: Settings | None = None,
+        family_id: str = DEFAULT_FAMILY_ID,
+    ) -> None:
         self.settings = settings or get_settings()
         self.db_path = db_path or self.settings.database_path
+        self.family_id = family_id
         ensure_db_schema(self.db_path, self.settings)
 
     def _connect(self) -> sqlite3.Connection:
@@ -49,11 +56,12 @@ class PreferenceIndex:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO feedback_index
-                (feedback_id, meal_title, meal_block, rating, comment, body)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (feedback_id, family_id, meal_title, meal_block, rating, comment, body)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     feedback.id or "",
+                    self.family_id,
                     feedback.meal_title,
                     feedback.meal_block or "",
                     feedback.rating.value,
@@ -76,10 +84,10 @@ class PreferenceIndex:
     ) -> list[IndexedFeedback]:
         if query.strip():
             fts_query = " OR ".join(f'"{t}"' for t in query.split()[:6])
-            block_filter = ""
-            params: list = [fts_query]
+            block_filter = " AND f.family_id = ?"
+            params: list = [fts_query, self.family_id]
             if meal_block:
-                block_filter = " AND f.meal_block = ?"
+                block_filter += " AND f.meal_block = ?"
                 params.append(meal_block)
             params.append(top_k)
             sql = f"""
@@ -128,16 +136,19 @@ class PreferenceIndex:
         if meal_block:
             sql = """
                 SELECT feedback_id, meal_title, meal_block, rating, comment, 0 AS score
-                FROM feedback_index WHERE meal_block = ? OR meal_block = ''
+                FROM feedback_index
+                WHERE family_id = ? AND (meal_block = ? OR meal_block = '')
                 ORDER BY rowid DESC LIMIT ?
             """
-            params: list = [meal_block, top_k]
+            params: list = [self.family_id, meal_block, top_k]
         else:
             sql = """
                 SELECT feedback_id, meal_title, meal_block, rating, comment, 0 AS score
-                FROM feedback_index ORDER BY rowid DESC LIMIT ?
+                FROM feedback_index
+                WHERE family_id = ?
+                ORDER BY rowid DESC LIMIT ?
             """
-            params = [top_k]
+            params = [self.family_id, top_k]
         with self._connect() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [self._row_to_feedback(r) for r in rows]

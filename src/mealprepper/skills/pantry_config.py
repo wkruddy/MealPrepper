@@ -2,14 +2,22 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from mealprepper.config import Settings, get_settings
+
+if TYPE_CHECKING:
+    from mealprepper.services.family_resolver import FamilyContext
 
 
 @dataclass
 class PantryConfig:
     on_hand: set[str] = field(default_factory=set)
     weekly_staples: set[str] = field(default_factory=set)
+
+    @classmethod
+    def from_family_context(cls, ctx: FamilyContext) -> PantryConfig:
+        return ctx.pantry
 
     @classmethod
     def from_settings(cls, settings: Settings | None = None) -> PantryConfig:

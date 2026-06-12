@@ -7,6 +7,7 @@ from pathlib import Path
 
 from mealprepper.config import Settings, get_settings
 from mealprepper.models.recipe_repository import SavedRecipe
+from mealprepper.storage.migrations import DEFAULT_FAMILY_ID
 from mealprepper.storage.sqlite import ensure_db_schema
 
 logger = logging.getLogger(__name__)
@@ -28,9 +29,15 @@ class IndexedRecipe:
 class RecipeIndex:
     """FTS5 index for the family recipe repository."""
 
-    def __init__(self, db_path: Path | None = None, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        db_path: Path | None = None,
+        settings: Settings | None = None,
+        family_id: str = DEFAULT_FAMILY_ID,
+    ) -> None:
         self.settings = settings or get_settings()
         self.db_path = db_path or self.settings.database_path
+        self.family_id = family_id
         ensure_db_schema(self.db_path, self.settings)
 
     def _connect(self) -> sqlite3.Connection:
@@ -57,12 +64,13 @@ class RecipeIndex:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO recipe_repository
-                (id, title, source_type, source_url, source_label, content_hash, raw_text,
+                (id, family_id, title, source_type, source_url, source_label, content_hash, raw_text,
                  recipe_json, meal_blocks, tags, notes, favorite, body, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     recipe_id,
+                    self.family_id,
                     recipe.title,
                     recipe.source_type,
                     recipe.source_url,
@@ -97,10 +105,10 @@ class RecipeIndex:
             return self.recent(top_k=top_k, meal_block=meal_block)
 
         fts_query = self._fts_query(query)
-        block_filter = ""
-        params: list = [fts_query]
+        block_filter = " AND r.family_id = ?"
+        params: list = [fts_query, self.family_id]
         if meal_block:
-            block_filter = " AND (r.meal_blocks LIKE ? OR r.meal_blocks = '')"
+            block_filter += " AND (r.meal_blocks LIKE ? OR r.meal_blocks = '')"
             params.append(f"%{meal_block}%")
         params.append(top_k if top_k > 0 else -1)
 
@@ -127,9 +135,9 @@ class RecipeIndex:
         sql = """
             SELECT id, title, meal_blocks, tags, source_type, source_label, notes, 0 AS score
             FROM recipe_repository
-            WHERE favorite = 1
+            WHERE favorite = 1 AND family_id = ?
         """
-        params: list = []
+        params: list = [self.family_id]
         if meal_block:
             sql += " AND (meal_blocks LIKE ? OR meal_blocks = '')"
             params.append(f"%{meal_block}%")
@@ -178,9 +186,10 @@ class RecipeIndex:
         sql = """
             SELECT id, title, meal_blocks, tags, source_type, source_label, notes, 0 AS score
             FROM recipe_repository
-            WHERE favorite = 1 AND (title LIKE ? OR notes LIKE ? OR body LIKE ? OR tags LIKE ?)
+            WHERE favorite = 1 AND family_id = ?
+              AND (title LIKE ? OR notes LIKE ? OR body LIKE ? OR tags LIKE ?)
         """
-        params: list = [pattern, pattern, pattern, pattern]
+        params: list = [self.family_id, pattern, pattern, pattern, pattern]
         if meal_block:
             sql += " AND (meal_blocks LIKE ? OR meal_blocks = '')"
             params.append(f"%{meal_block}%")
